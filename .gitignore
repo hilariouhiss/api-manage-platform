@@ -18,5 +18,8 @@ reasonix.toml
 .vscode/
 .idea/
 
+# Environment
+.env
+
 
 
