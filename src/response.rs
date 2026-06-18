@@ -10,12 +10,22 @@ pub struct ApiResponse<T: Serialize> {
 }
 
 impl<T: Serialize> ApiResponse<T> {
-    /// 创建一个成功的响应
+    /// 创建一个成功的响应（带数据）
     pub fn success(message: impl Into<String>, data: T) -> Self {
         Self {
             code: 200,
             message: message.into(),
             data: Some(data),
+        }
+    }
+
+    /// 创建一个仅含消息的成功响应（code=200, data=None）
+    /// 适用于 health check、简单确认等场景
+    pub fn ok(message: impl Into<String>) -> Self {
+        Self {
+            code: 200,
+            message: message.into(),
+            data: None,
         }
     }
 
