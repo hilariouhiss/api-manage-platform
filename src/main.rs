@@ -1,3 +1,4 @@
+mod config;
 mod response;
 mod routes;
 
