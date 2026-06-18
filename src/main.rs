@@ -3,7 +3,7 @@ mod response;
 mod routes;
 
 use anyhow::Context;
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,8 +14,7 @@ async fn main() -> anyhow::Result<()> {
     // 提前取出绑定地址（with_state 会 move shared_config）
     let addr = format!(
         "{}:{}",
-        shared_config.server.host,
-        shared_config.server.port
+        shared_config.server.host, shared_config.server.port
     );
 
     // 构建路由并传入配置

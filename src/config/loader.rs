@@ -113,7 +113,10 @@ mod tests {
     fn set_env(key: &str, value: &str) -> EnvGuard {
         let prev = std::env::var(key).ok();
         unsafe { std::env::set_var(key, value) };
-        EnvGuard { key: key.to_string(), prev }
+        EnvGuard {
+            key: key.to_string(),
+            prev,
+        }
     }
 
     struct EnvGuard {
@@ -195,8 +198,14 @@ format = "json"
         let _l = set_env("APP__LOGGING__LEVEL", "debug");
 
         let cfg = load().unwrap();
-        assert_eq!(cfg.server.port, 8080, "env var should override default port");
-        assert_eq!(cfg.logging.level, "debug", "env var should override log level");
+        assert_eq!(
+            cfg.server.port, 8080,
+            "env var should override default port"
+        );
+        assert_eq!(
+            cfg.logging.level, "debug",
+            "env var should override log level"
+        );
         // 未被覆盖的字段保持默认值
         assert_eq!(cfg.server.host, "127.0.0.1");
     }
@@ -220,8 +229,14 @@ level = "debug"
         let _envs = setup_base_env(&dir);
 
         let cfg = load().unwrap();
-        assert_eq!(cfg.server.port, 9999, "development.toml should override default port");
-        assert_eq!(cfg.logging.level, "debug", "development.toml should override log level");
+        assert_eq!(
+            cfg.server.port, 9999,
+            "development.toml should override default port"
+        );
+        assert_eq!(
+            cfg.logging.level, "debug",
+            "development.toml should override log level"
+        );
         assert_eq!(cfg.server.host, "127.0.0.1");
     }
 
@@ -234,7 +249,10 @@ level = "debug"
         let _e = set_env("APP_ENV", "staging");
 
         let result = load();
-        assert!(result.is_ok(), "Missing env-specific file should not cause error");
+        assert!(
+            result.is_ok(),
+            "Missing env-specific file should not cause error"
+        );
     }
 
     /// 测试 5: default.toml 缺失时返回错误
@@ -264,7 +282,11 @@ level = "debug"
         let result = load();
         assert!(result.is_err(), "Missing APP_ENV should cause error");
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("APP_ENV"), "Error should mention APP_ENV: {}", err);
+        assert!(
+            err.contains("APP_ENV"),
+            "Error should mention APP_ENV: {}",
+            err
+        );
     }
 
     /// 测试 6b: APP_ENV 值不在白名单中时返回错误
@@ -279,7 +301,11 @@ level = "debug"
         let result = load();
         assert!(result.is_err(), "Invalid APP_ENV value should cause error");
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("APP_ENV"), "Error should mention APP_ENV: {}", err);
+        assert!(
+            err.contains("APP_ENV"),
+            "Error should mention APP_ENV: {}",
+            err
+        );
     }
 
     /// 测试 7: 未设置 APP__JWT__SECRET 时返回错误
@@ -292,7 +318,10 @@ level = "debug"
         unsafe { std::env::remove_var("APP__JWT__SECRET") };
 
         let result = load();
-        assert!(result.is_err(), "Missing JWT secret should cause validation error");
+        assert!(
+            result.is_err(),
+            "Missing JWT secret should cause validation error"
+        );
     }
 
     /// 测试 8: APP__JWT__SECRET 长度不足 32 字符时返回错误
@@ -305,7 +334,10 @@ level = "debug"
         let _sec = set_env("APP__JWT__SECRET", "too-short");
 
         let result = load();
-        assert!(result.is_err(), "Short JWT secret should cause validation error");
+        assert!(
+            result.is_err(),
+            "Short JWT secret should cause validation error"
+        );
     }
 
     /// 测试 8b: TOML 中有 jwt.secret 但没有 APP__JWT__SECRET 环境变量 → 失败
@@ -372,7 +404,10 @@ port = 4000
         let _p = set_env("APP__SERVER__PORT", "5000"); // env beats both
 
         let cfg = load().unwrap();
-        assert_eq!(cfg.server.port, 5000, "env var should have highest priority");
+        assert_eq!(
+            cfg.server.port, 5000,
+            "env var should have highest priority"
+        );
     }
 
     /// 测试 11: 环境变量类型转换 — 字符串 "20" 正确反序列化为 u32
@@ -414,7 +449,10 @@ format = "json"
         let _envs = setup_base_env(&dir);
 
         let result = load();
-        assert!(result.is_err(), "Missing database section should cause deserialization error");
+        assert!(
+            result.is_err(),
+            "Missing database section should cause deserialization error"
+        );
     }
 
     /// 测试 13: logging.level 只接受有效值
@@ -425,7 +463,10 @@ format = "json"
         let _l = set_env("APP__LOGGING__LEVEL", "verbose");
 
         let result = load();
-        assert!(result.is_err(), "Invalid log level should cause validation error");
+        assert!(
+            result.is_err(),
+            "Invalid log level should cause validation error"
+        );
     }
 
     /// 测试 14: logging.format 只接受有效值
@@ -436,7 +477,10 @@ format = "json"
         let _f = set_env("APP__LOGGING__FORMAT", "text");
 
         let result = load();
-        assert!(result.is_err(), "Invalid log format should cause validation error");
+        assert!(
+            result.is_err(),
+            "Invalid log format should cause validation error"
+        );
     }
 
     /// 测试 15: CONFIG_DIR 可覆盖默认配置目录
