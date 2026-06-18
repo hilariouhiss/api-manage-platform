@@ -1,0 +1,17 @@
+[server]
+host = "127.0.0.1"
+port = 3000
+
+[database]
+url = "postgres://localhost:5432/api_platform"
+max_connections = 10
+
+[valkey]
+url = "redis://localhost:6379"
+
+[jwt]
+expiry_hours = 24
+
+[logging]
+level = "info"
+format = "json"
