@@ -1,0 +1,30 @@
+# Auto-detect text files and normalize line endings to LF
+* text=auto
+
+# Rust source files
+*.rs text diff=rust
+
+# TOML config files
+Cargo.toml text
+Cargo.lock text linguist-generated=true -merge
+
+# JSON / YAML
+*.json text
+*.yaml text
+*.yml text
+
+# Markdown documentation
+*.md text
+
+# Shell scripts (always LF)
+*.sh text eol=lf
+
+# Windows batch (always CRLF)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Exclude from archive exports
+.gitattributes export-ignore
+.gitignore export-ignore
+.github/ export-ignore
+.reasonix/ export-ignore
