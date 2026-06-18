@@ -11,6 +11,9 @@ reasonix.toml
 .superpowers/
 .codegraph/
 
+# Worktrees
+.worktrees/
+
 # IDE files
 .vscode/
 .idea/
