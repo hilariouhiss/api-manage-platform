@@ -2,6 +2,7 @@ mod config;
 mod db;
 mod response;
 mod routes;
+mod valkey;
 
 use anyhow::Context;
 use axum::{Router, routing::get};
