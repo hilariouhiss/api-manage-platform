@@ -40,7 +40,7 @@ sqlx migrate run --database-url <DATABASE_URL>
 ## 技术栈
 
 | 用途 | 库 | 关键版本/特性 |
-|------|-----|--------------|
+| ------ | ----- | -------------- |
 | Web 框架 | `axum` 0.8 | |
 | 异步运行时 | `tokio` 1.52 | `features = ["full"]` |
 | 中间件 | `tower` 0.5, `tower-http` 0.7 | CORS, trace |
@@ -58,7 +58,7 @@ sqlx migrate run --database-url <DATABASE_URL>
 
 ## 代码架构
 
-```
+```text
 src/
 ├── main.rs          # 入口点：路由注册、启动 TCP listener
 ├── response.rs      # 统一 API 响应封装 ApiResponse<T>
@@ -89,6 +89,7 @@ config/
 ### 依赖规划
 
 依赖列表表明项目规划支持：
+
 - **数据库操作**（sqlx + PostgreSQL，含迁移支持）
 - **Redis 缓存**（fred）
 - **用户认证**（argon2 密码哈希 + JWT token）
