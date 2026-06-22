@@ -47,7 +47,7 @@ sqlx migrate run --database-url <DATABASE_URL>
 | 序列化 | `serde` 1.0, `serde_json` 1.0 | derive macro |
 | HTTP 客户端 | `reqwest` 0.13 | json feature |
 | 数据库 | `sqlx` 0.9 | PostgreSQL, rustls, uuid, chrono, migrate |
-| 缓存/Redis | `fred` 10.1 | rustls |
+| 缓存/Redis | `fred` 10.1 | rustls。⚠ 初始化池必须用 `Config::from_url(&url)` + `Builder::from_config(config)` 传入地址；`Builder::default_centralized()` 会忽略 URL |
 | 认证 | `argon2` 0.5, `jsonwebtoken` 10.4 | |
 | 校验 | `validator` 0.20 | derive macro |
 | UUID | `uuid` 1.23 | v7, serde |
@@ -60,7 +60,10 @@ sqlx migrate run --database-url <DATABASE_URL>
 
 ```text
 src/
-├── main.rs          # 入口点：路由注册、启动 TCP listener
+├── main.rs          # 入口点：启动建连、路由注册、TCP listener
+├── state.rs         # AppState 聚合状态（FromRef derive）
+├── db.rs            # PostgreSQL 连接池初始化
+├── valkey.rs        # Valkey 连接池初始化
 ├── response.rs      # 统一 API 响应封装 ApiResponse<T>
 ├── config/
 │   ├── mod.rs       # AppConfig 聚合结构体 + SharedConfig 类型别名
@@ -79,9 +82,9 @@ config/
 
 ### 核心模式
 
+- **状态注入**：使用 `AppState` + `#[derive(FromRef)]` 作为 axum 单一顶层 State。Handler 可按需提取子状态：`State<PgPool>`、`State<SharedConfig>`、`State<ValkeyPool>`。`axum` 需要启用 `macros` feature。
+- **配置注入**：`config::load()` → `SharedConfig`（`Arc<AppConfig>`）→ 存入 `AppState.config`。
 - **统一响应格式**：所有 API 端点返回 `ApiResponse<T>`（定义在 `src/response.rs`），包含 `code`、`message`、`data` 字段。提供了 `success()`、`ok()`、`failure()`、`message()` 工厂方法。`ApiResponse` 实现了 `IntoResponse`，自动序列化为 JSON。
-- **路由组织**：路由使用 `axum::Router`，端点按功能模块化到 `routes/` 目录，通过 `routes/mod.rs` 声明子模块。
-- **配置注入**：`config::load()` → `SharedConfig`（`Arc<AppConfig>`）→ axum State。handler 通过 `State<config::SharedConfig>` 提取配置。
 - **环境变量格式**：`APP__` 前缀 + `__` 分隔符 → 嵌套结构体。如 `APP__SERVER__PORT=8080` → `server.port`。
 - **配置加载顺序**：`default.toml` → `{APP_ENV}.toml`（可选）→ 环境变量 `APP__*`（最高优先级）。
 - **Rust edition 2024**：项目使用 Rust 2024 edition。`std::env::set_var` / `remove_var` 在此 edition 中为 `unsafe`。
@@ -100,6 +103,7 @@ config/
 
 ## 开发约定
 
+- **启动流程**：tracing init → config::load() → db::init_pool() → valkey::init_pool() → AppState → Router → serve。连接失败使用 `.inspect_err(\|e\| tracing::error!(…))` 记录日志后退出，fail-fast 不延迟连接。
 - **首次运行**：`cp .env.example .env` → 设置 `APP_ENV` 和 `APP__JWT__SECRET` → `cargo run`
 - **环境变量测试**：`cargo test -- --test-threads=1`（`set_var`/`remove_var` 在 Rust 2024 中为 `unsafe`，测试必须串行）
 - **Secrets**：`jwt.secret` 不写入 TOML，必须通过 `APP__JWT__SECRET` 注入。`#[serde(default)]` + validator `length(min=32)` + loader 显式检查三重保证
