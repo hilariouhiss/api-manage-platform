@@ -150,9 +150,15 @@ port = 3000
 [database]
 url = "postgres://localhost/db"
 max_connections = 10
+min_connections = 1
+acquire_timeout_seconds = 30
+idle_timeout_minutes = 30
 
 [valkey]
 url = "redis://localhost:6379"
+pool_size = 8
+connect_timeout_seconds = 10
+internal_command_timeout_seconds = 10
 
 [jwt]
 expiry_hours = 24
@@ -351,9 +357,15 @@ port = 3000
 [database]
 url = "postgres://localhost/db"
 max_connections = 10
+min_connections = 1
+acquire_timeout_seconds = 30
+idle_timeout_minutes = 30
 
 [valkey]
 url = "redis://localhost:6379"
+pool_size = 8
+connect_timeout_seconds = 10
+internal_command_timeout_seconds = 10
 
 [jwt]
 secret = "a-valid-secret-in-toml-at-least-32!!"
@@ -496,9 +508,15 @@ port = 1111
 [database]
 url = "postgres://localhost/db"
 max_connections = 10
+min_connections = 1
+acquire_timeout_seconds = 30
+idle_timeout_minutes = 30
 
 [valkey]
 url = "redis://localhost:6379"
+pool_size = 8
+connect_timeout_seconds = 10
+internal_command_timeout_seconds = 10
 
 [jwt]
 expiry_hours = 24
@@ -519,9 +537,15 @@ port = 2222
 [database]
 url = "postgres://other/db"
 max_connections = 5
+min_connections = 1
+acquire_timeout_seconds = 30
+idle_timeout_minutes = 30
 
 [valkey]
 url = "redis://other:6380"
+pool_size = 16
+connect_timeout_seconds = 5
+internal_command_timeout_seconds = 5
 
 [jwt]
 expiry_hours = 12

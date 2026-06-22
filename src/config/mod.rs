@@ -210,7 +210,24 @@ mod tests {
         let cfg = DatabaseConfig {
             url: "postgres://localhost/db".into(),
             max_connections: 10,
+            min_connections: 1,
+            acquire_timeout_seconds: 30,
+            idle_timeout_minutes: 30,
         };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_database_config_min_gt_max_invalid() {
+        let cfg = DatabaseConfig {
+            url: "postgres://localhost/db".into(),
+            max_connections: 5,
+            min_connections: 10,
+            acquire_timeout_seconds: 30,
+            idle_timeout_minutes: 30,
+        };
+        // validator range 不会通过，因为 min_connections(10) 仍在 0..=100 内
+        // 这个校验在 db::init_pool() 的 anyhow::ensure! 中完成
         assert!(cfg.validate().is_ok());
     }
 
@@ -219,6 +236,9 @@ mod tests {
         let cfg = DatabaseConfig {
             url: "postgres://localhost/db".into(),
             max_connections: 0,
+            min_connections: 1,
+            acquire_timeout_seconds: 30,
+            idle_timeout_minutes: 30,
         };
         assert!(cfg.validate().is_err());
     }
@@ -228,6 +248,9 @@ mod tests {
         let cfg = DatabaseConfig {
             url: "".into(),
             max_connections: 10,
+            min_connections: 1,
+            acquire_timeout_seconds: 30,
+            idle_timeout_minutes: 30,
         };
         assert!(cfg.validate().is_err());
     }
@@ -238,13 +261,21 @@ mod tests {
     fn test_valkey_config_valid() {
         let cfg = ValkeyConfig {
             url: "redis://localhost:6379".into(),
+            pool_size: 8,
+            connect_timeout_seconds: 10,
+            internal_command_timeout_seconds: 10,
         };
         assert!(cfg.validate().is_ok());
     }
 
     #[test]
     fn test_valkey_config_empty_url_invalid() {
-        let cfg = ValkeyConfig { url: "".into() };
+        let cfg = ValkeyConfig {
+            url: "".into(),
+            pool_size: 8,
+            connect_timeout_seconds: 10,
+            internal_command_timeout_seconds: 10,
+        };
         assert!(cfg.validate().is_err());
     }
 
@@ -345,9 +376,15 @@ mod tests {
             database: DatabaseConfig {
                 url: "postgres://localhost/db".into(),
                 max_connections: 10,
+                min_connections: 1,
+                acquire_timeout_seconds: 30,
+                idle_timeout_minutes: 30,
             },
             valkey: ValkeyConfig {
                 url: "redis://localhost:6379".into(),
+                pool_size: 8,
+                connect_timeout_seconds: 10,
+                internal_command_timeout_seconds: 10,
             },
             jwt: JwtConfig {
                 secret: "a-strong-secret-at-least-32-chars!".into(),
