@@ -25,8 +25,7 @@ pub async fn init_pool(cfg: &ValkeyConfig) -> anyhow::Result<ValkeyPool> {
 
     builder.with_connection_config(|conn| {
         conn.connection_timeout = Duration::from_secs(cfg.connect_timeout_seconds);
-        conn.internal_command_timeout =
-            Duration::from_secs(cfg.internal_command_timeout_seconds);
+        conn.internal_command_timeout = Duration::from_secs(cfg.internal_command_timeout_seconds);
     });
 
     let pool = builder
@@ -38,10 +37,7 @@ pub async fn init_pool(cfg: &ValkeyConfig) -> anyhow::Result<ValkeyPool> {
         .context("failed to initialize valkey pool")?;
 
     // 连通性校验
-    let _: String = pool
-        .ping(None)
-        .await
-        .context("failed to ping valkey")?;
+    let _: String = pool.ping(None).await.context("failed to ping valkey")?;
 
     Ok(pool)
 }

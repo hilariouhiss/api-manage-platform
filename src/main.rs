@@ -14,8 +14,7 @@ async fn main() -> anyhow::Result<()> {
     // 初始化 tracing（在加载配置前输出日志）
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -39,13 +38,15 @@ async fn main() -> anyhow::Result<()> {
         .await
         .inspect_err(|e| tracing::error!("failed to connect to valkey: {:#}", e))
         .context("failed to connect to valkey")?;
-    tracing::info!("valkey connected (pool size: {})", shared_config.valkey.pool_size);
+    tracing::info!(
+        "valkey connected (pool size: {})",
+        shared_config.valkey.pool_size
+    );
 
     // 4. 提取绑定地址（在构建 state 之前，避免后续 move 问题）
     let addr = format!(
         "{}:{}",
-        shared_config.server.host,
-        shared_config.server.port
+        shared_config.server.host, shared_config.server.port
     );
 
     // 5. 构建 State

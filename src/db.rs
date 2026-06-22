@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use anyhow::{Context, ensure};
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 
 use crate::config::DatabaseConfig;
 
