@@ -53,6 +53,27 @@ pub struct DatabaseConfig {
         message = "database.max_connections must be between 1 and 100"
     ))]
     pub max_connections: u32,
+
+    #[validate(range(
+        min = 0,
+        max = 100,
+        message = "database.min_connections must be between 0 and 100"
+    ))]
+    pub min_connections: u32,
+
+    #[validate(range(
+        min = 1,
+        max = 300,
+        message = "database.acquire_timeout_seconds must be between 1 and 300"
+    ))]
+    pub acquire_timeout_seconds: u64,
+
+    #[validate(range(
+        min = 1,
+        max = 1440,
+        message = "database.idle_timeout_minutes must be between 1 and 1440"
+    ))]
+    pub idle_timeout_minutes: u64,
 }
 
 /// Valkey 缓存配置
@@ -60,6 +81,27 @@ pub struct DatabaseConfig {
 pub struct ValkeyConfig {
     #[validate(length(min = 1, message = "valkey.url must not be empty"))]
     pub url: String,
+
+    #[validate(range(
+        min = 1,
+        max = 256,
+        message = "valkey.pool_size must be between 1 and 256"
+    ))]
+    pub pool_size: u32,
+
+    #[validate(range(
+        min = 1,
+        max = 60,
+        message = "valkey.connect_timeout_seconds must be between 1 and 60"
+    ))]
+    pub connect_timeout_seconds: u64,
+
+    #[validate(range(
+        min = 1,
+        max = 60,
+        message = "valkey.internal_command_timeout_seconds must be between 1 and 60"
+    ))]
+    pub internal_command_timeout_seconds: u64,
 }
 
 /// JWT 认证配置
