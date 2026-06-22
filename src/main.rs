@@ -2,32 +2,66 @@ mod config;
 mod db;
 mod response;
 mod routes;
+mod state;
 mod valkey;
 
 use anyhow::Context;
-use axum::{Router, routing::get};
+
+use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // 加载配置
+    // 初始化 tracing（在加载配置前输出日志）
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info".into()),
+        )
+        .init();
+
+    // 1. 加载配置
     let app_config = config::load().context("failed to load config")?;
     let shared_config = config::SharedConfig::new(app_config);
 
-    // 提前取出绑定地址（with_state 会 move shared_config）
-    let addr = format!(
-        "{}:{}",
-        shared_config.server.host, shared_config.server.port
+    // 2. 初始化数据库连接池
+    let db_pool = db::init_pool(&shared_config.database)
+        .await
+        .context("failed to connect to database")?;
+    tracing::info!(
+        "database connected (pool: {}..={})",
+        shared_config.database.min_connections,
+        shared_config.database.max_connections
     );
 
-    // 构建路由并传入配置
-    let app = Router::new()
-        .route("/api/v1/hello", get(routes::hello::hello))
-        .with_state(shared_config);
+    // 3. 初始化 Valkey 连接池
+    let valkey_pool = valkey::init_pool(&shared_config.valkey)
+        .await
+        .context("failed to connect to valkey")?;
+    tracing::info!("valkey connected (pool size: {})", shared_config.valkey.pool_size);
+
+    // 4. 提取绑定地址（在构建 state 之前，避免后续 move 问题）
+    let addr = format!(
+        "{}:{}",
+        shared_config.server.host,
+        shared_config.server.port
+    );
+
+    // 5. 构建 State
+    let state = AppState {
+        config: shared_config,
+        db: db_pool,
+        valkey: valkey_pool,
+    };
+
+    // 6. 路由
+    let app = axum::Router::new()
+        .route("/api/v1/hello", axum::routing::get(routes::hello::hello))
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .with_context(|| format!("failed to bind to {}", addr))?;
-    println!("🚀 Server running at http://{}", addr);
+    tracing::info!("server starting at http://{}", addr);
     axum::serve(listener, app).await?;
 
     Ok(())
