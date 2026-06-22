@@ -26,6 +26,7 @@ async fn main() -> anyhow::Result<()> {
     // 2. 初始化数据库连接池
     let db_pool = db::init_pool(&shared_config.database)
         .await
+        .inspect_err(|e| tracing::error!("failed to connect to database: {:#}", e))
         .context("failed to connect to database")?;
     tracing::info!(
         "database connected (pool: {}..={})",
@@ -36,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
     // 3. 初始化 Valkey 连接池
     let valkey_pool = valkey::init_pool(&shared_config.valkey)
         .await
+        .inspect_err(|e| tracing::error!("failed to connect to valkey: {:#}", e))
         .context("failed to connect to valkey")?;
     tracing::info!("valkey connected (pool size: {})", shared_config.valkey.pool_size);
 
