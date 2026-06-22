@@ -10,7 +10,7 @@ pub type ValkeyPool = fred::clients::Pool;
 
 /// 初始化 Valkey 连接池
 ///
-/// 使用 `Builder::default_centralized()` 创建单机模式的 Builder，
+/// 从 URL 解析 `Config`，使用 `Builder::from_config()` 创建 Builder，
 /// 通过 `with_connection_config` 设置超时参数，然后 `build_pool` 构建连接池。
 /// `pool.init()` 立即初始化所有连接，随后 `PING` 做连通性校验。
 /// 失败时返回错误，由调用方记录日志并退出。
@@ -21,7 +21,8 @@ pub async fn init_pool(cfg: &ValkeyConfig) -> anyhow::Result<ValkeyPool> {
         cfg.pool_size
     );
 
-    let mut builder = Builder::default_centralized();
+    let config = Config::from_url(&cfg.url).context("invalid valkey url")?;
+    let mut builder = Builder::from_config(config);
 
     builder.with_connection_config(|conn| {
         conn.connection_timeout = Duration::from_secs(cfg.connect_timeout_seconds);
