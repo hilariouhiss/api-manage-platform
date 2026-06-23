@@ -9,11 +9,18 @@ reasonix.toml
 # Agent generated files
 .remember/
 .superpowers/
+/docs/superpowers/
 .codegraph/
+
+# Worktrees
+.worktrees/
 
 # IDE files
 .vscode/
 .idea/
+
+# Environment
+.env
 
 
 
