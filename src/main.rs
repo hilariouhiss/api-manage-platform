@@ -1,28 +1,23 @@
-mod config;
-mod db;
-mod response;
-mod routes;
-mod state;
-mod valkey;
+use api_manage_platform::config;
+use api_manage_platform::db;
+use api_manage_platform::routes;
+use api_manage_platform::shutdown;
+use api_manage_platform::valkey;
 
 use anyhow::Context;
 
-use state::AppState;
+use api_manage_platform::state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // 初始化 tracing（在加载配置前输出日志）
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .init();
-
-    // 1. 加载配置
+    // --- Configuration ---
     let app_config = config::load().context("failed to load config")?;
     let shared_config = config::SharedConfig::new(app_config);
 
-    // 2. 初始化数据库连接池
+    // --- Tracing ---
+    let _tracing_guard = shutdown::init_tracing()?;
+
+    // --- Database ---
     let db_pool = db::init_pool(&shared_config.database)
         .await
         .inspect_err(|e| tracing::error!("failed to connect to database: {:#}", e))
@@ -33,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
         shared_config.database.max_connections
     );
 
-    // 3. 初始化 Valkey 连接池
+    // --- Valkey ---
     let valkey_pool = valkey::init_pool(&shared_config.valkey)
         .await
         .inspect_err(|e| tracing::error!("failed to connect to valkey: {:#}", e))
@@ -43,20 +38,42 @@ async fn main() -> anyhow::Result<()> {
         shared_config.valkey.pool_size
     );
 
-    // 4. 提取绑定地址（在构建 state 之前，避免后续 move 问题）
+    // --- Bind address ---
     let addr = format!(
         "{}:{}",
         shared_config.server.host, shared_config.server.port
     );
 
-    // 5. 构建 State
+    // --- Shutdown registry ---
+    let db_cleanup = db_pool.clone();
+    let valkey_cleanup = valkey_pool.clone();
+
+    let mut registry = shutdown::ShutdownRegistry::new();
+    // Register in reverse shutdown order: tracing first → cleaned up last
+    registry.register("tracing", Box::new(move || {
+        Box::pin(async move {
+            drop(_tracing_guard);
+            Ok(())
+        })
+    }));
+    registry.register("database", Box::new(move || {
+        Box::pin(async move {
+            db::close_pool(&db_cleanup).await;
+            Ok(())
+        })
+    }));
+    registry.register("valkey", Box::new(move || {
+        Box::pin(async move { valkey::close_pool(&valkey_cleanup).await })
+    }));
+
+    // --- Application state ---
     let state = AppState {
         config: shared_config,
         db: db_pool,
         valkey: valkey_pool,
     };
 
-    // 6. 路由
+    // --- Routes ---
     let app = axum::Router::new()
         .route("/api/v1/hello", axum::routing::get(routes::hello::hello))
         .with_state(state);
@@ -65,7 +82,13 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind to {}", addr))?;
     tracing::info!("server starting at http://{}", addr);
-    axum::serve(listener, app).await?;
 
-    Ok(())
+    // --- Start server (with graceful shutdown) ---
+    shutdown::run(
+        listener,
+        app,
+        registry,
+        shutdown::GracefulShutdownConfig::default(),
+    )
+    .await
 }
