@@ -4,8 +4,9 @@
 # Agent config files
 .reasonix/
 reasonix.toml
-.claude/*.local.json
+.claude/
 .qoder/
+/openspec/
 
 # Agent generated files
 .remember/
