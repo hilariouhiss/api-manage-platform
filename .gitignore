@@ -5,6 +5,7 @@
 .reasonix/
 reasonix.toml
 .claude/*.local.json
+.qoder/
 
 # Agent generated files
 .remember/
