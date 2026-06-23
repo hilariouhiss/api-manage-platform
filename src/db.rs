@@ -1,3 +1,8 @@
+//! Database module.
+//!
+//! Provides PostgreSQL connection pool initialization and shutdown
+//! via [`init_pool`] and [`close_pool`].
+
 use std::time::Duration;
 
 use anyhow::{Context, ensure};
@@ -6,10 +11,11 @@ use sqlx::postgres::PgPoolOptions;
 
 use crate::config::DatabaseConfig;
 
-/// 初始化 PostgreSQL 连接池
+/// Initialize a PostgreSQL connection pool.
 ///
-/// 校验 `min_connections <= max_connections`，然后立即尝试建立至少一个连接。
-/// 失败时返回错误，由调用方记录日志并退出。
+/// Validates that `min_connections <= max_connections`, then immediately
+/// attempts to establish at least one connection. Returns an error on
+/// failure; the caller is responsible for logging and exiting.
 pub async fn init_pool(cfg: &DatabaseConfig) -> anyhow::Result<PgPool> {
     ensure!(
         cfg.min_connections <= cfg.max_connections,
@@ -26,4 +32,13 @@ pub async fn init_pool(cfg: &DatabaseConfig) -> anyhow::Result<PgPool> {
         .connect(&cfg.url)
         .await
         .context("failed to connect to database")
+}
+
+/// Close a PostgreSQL connection pool.
+///
+/// `PgPool::close()` is infallible (returns `()`). It immediately wakes
+/// all tasks waiting for a connection; subsequent `acquire` calls return
+/// `PoolClosed`.
+pub async fn close_pool(pool: &PgPool) {
+    pool.close().await;
 }

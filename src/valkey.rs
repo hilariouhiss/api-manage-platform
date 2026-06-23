@@ -1,3 +1,8 @@
+//! Valkey (Redis) module.
+//!
+//! Provides Valkey connection pool initialization and shutdown
+//! via [`init_pool`] and [`close_pool`].
+
 use std::time::Duration;
 
 use anyhow::{Context, ensure};
@@ -5,15 +10,17 @@ use fred::prelude::*;
 
 use crate::config::ValkeyConfig;
 
-/// Valkey 连接池类型别名
+/// Valkey connection pool type alias.
 pub type ValkeyPool = fred::clients::Pool;
 
-/// 初始化 Valkey 连接池
+/// Initialize a Valkey connection pool.
 ///
-/// 从 URL 解析 `Config`，使用 `Builder::from_config()` 创建 Builder，
-/// 通过 `with_connection_config` 设置超时参数，然后 `build_pool` 构建连接池。
-/// `pool.init()` 立即初始化所有连接，随后 `PING` 做连通性校验。
-/// 失败时返回错误，由调用方记录日志并退出。
+/// Builds a [`Config`] from the URL, creates a [`Builder`] via
+/// `Builder::from_config()`, applies timeout settings through
+/// `with_connection_config`, then calls `build_pool`. After
+/// `pool.init()` initializes all connections, a `PING` command
+/// verifies connectivity. Returns an error on failure; the caller
+/// is responsible for logging and exiting.
 pub async fn init_pool(cfg: &ValkeyConfig) -> anyhow::Result<ValkeyPool> {
     ensure!(
         cfg.pool_size > 0,
@@ -37,8 +44,18 @@ pub async fn init_pool(cfg: &ValkeyConfig) -> anyhow::Result<ValkeyPool> {
         .await
         .context("failed to initialize valkey pool")?;
 
-    // 连通性校验
+    // Connectivity check
     let _: String = pool.ping(None).await.context("failed to ping valkey")?;
 
     Ok(pool)
+}
+
+/// Close a Valkey connection pool.
+///
+/// Sends a `QUIT` command to notify the server. The future returned
+/// by `fred::Pool::quit()` resolves once all connections have written
+/// their commands to the socket.
+pub async fn close_pool(pool: &ValkeyPool) -> anyhow::Result<()> {
+    pool.quit().await.context("failed to quit valkey pool")?;
+    Ok(())
 }

@@ -1,12 +1,17 @@
+//! Application state module.
+//!
+//! Defines [`AppState`], the shared application state injected into
+//! axum handlers via [`axum::extract::FromRef`].
+
 use axum::extract::FromRef;
 use sqlx::PgPool;
 
 use crate::config::SharedConfig;
 use crate::valkey::ValkeyPool;
 
-/// 应用共享状态
+/// Shared application state.
 ///
-/// 通过 `#[derive(FromRef)]` 支持 handler 按需提取子状态：
+/// Derives [`FromRef`] so handlers can extract sub-state on demand:
 ///
 /// ```rust,ignore
 /// async fn handler(State(db): State<PgPool>) { ... }

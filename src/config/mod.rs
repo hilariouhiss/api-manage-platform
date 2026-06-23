@@ -1,3 +1,8 @@
+//! Configuration module.
+//!
+//! Defines configuration structs with validation and re-exports
+//! the config loader ([`load`]) from the private [`loader`] submodule.
+
 use serde::Deserialize;
 use validator::Validate;
 
@@ -5,10 +10,10 @@ mod loader;
 
 pub use loader::load;
 
-/// 共享配置类型，用于 axum State 注入
+/// Shared configuration type for axum [`State`](axum::extract::State) injection.
 pub type SharedConfig = std::sync::Arc<AppConfig>;
 
-/// 应用配置聚合结构体
+/// Top-level application configuration.
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct AppConfig {
     #[validate(nested)]
@@ -27,7 +32,7 @@ pub struct AppConfig {
     pub logging: LoggingConfig,
 }
 
-/// 服务器配置
+/// Server configuration.
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct ServerConfig {
     #[validate(length(min = 1, message = "server.host must not be empty"))]
@@ -41,7 +46,7 @@ pub struct ServerConfig {
     pub port: u16,
 }
 
-/// 数据库配置
+/// Database configuration.
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct DatabaseConfig {
     #[validate(length(min = 1, message = "database.url must not be empty"))]
@@ -76,7 +81,7 @@ pub struct DatabaseConfig {
     pub idle_timeout_minutes: u64,
 }
 
-/// Valkey 缓存配置
+/// Valkey cache configuration.
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct ValkeyConfig {
     #[validate(length(min = 1, message = "valkey.url must not be empty"))]
@@ -104,11 +109,13 @@ pub struct ValkeyConfig {
     pub internal_command_timeout_seconds: u64,
 }
 
-/// JWT 认证配置
+/// JWT authentication configuration.
 ///
-/// `secret` 字段使用 `#[serde(default)]` 以允许 TOML 中缺失该字段。
-/// 实际约束由 validator（length >= 32）保证——无论是漏配还是 TOML 中写了短值都会被拒绝。
-/// 生产环境额外在 loader.rs 中做硬性检查。
+/// The `secret` field uses `#[serde(default)]` so it may be absent from
+/// TOML files. The actual constraint (length >= 32) is enforced by the
+/// validator — both a missing key and a short value are rejected. In
+/// production, the loader additionally enforces that the secret comes
+/// from an environment variable, never from a TOML file.
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct JwtConfig {
     #[serde(default)]
@@ -126,7 +133,7 @@ pub struct JwtConfig {
     pub expiry_hours: u32,
 }
 
-/// 日志配置
+/// Logging configuration.
 #[derive(Debug, Clone, Deserialize, Validate)]
 pub struct LoggingConfig {
     #[validate(custom(function = "validate_log_level"))]
@@ -174,7 +181,7 @@ fn validate_log_format(format: &str) -> Result<(), validator::ValidationError> {
 mod tests {
     use super::*;
 
-    // --- ServerConfig 校验 ---
+    // --- ServerConfig validation ---
 
     #[test]
     fn test_server_config_valid() {
@@ -203,7 +210,7 @@ mod tests {
         assert!(cfg.validate().is_err());
     }
 
-    // --- DatabaseConfig 校验 ---
+    // --- DatabaseConfig validation ---
 
     #[test]
     fn test_database_config_valid() {
@@ -226,8 +233,9 @@ mod tests {
             acquire_timeout_seconds: 30,
             idle_timeout_minutes: 30,
         };
-        // validator range 不会通过，因为 min_connections(10) 仍在 0..=100 内
-        // 这个校验在 db::init_pool() 的 anyhow::ensure! 中完成
+        // The validator's `range` check passes because min_connections (10)
+        // is still within 0..=100. This constraint is enforced separately
+        // in `db::init_pool()` via `anyhow::ensure!`.
         assert!(cfg.validate().is_ok());
     }
 
@@ -255,7 +263,7 @@ mod tests {
         assert!(cfg.validate().is_err());
     }
 
-    // --- ValkeyConfig 校验 ---
+    // --- ValkeyConfig validation ---
 
     #[test]
     fn test_valkey_config_valid() {
@@ -279,7 +287,7 @@ mod tests {
         assert!(cfg.validate().is_err());
     }
 
-    // --- JwtConfig 校验 ---
+    // --- JwtConfig validation ---
 
     #[test]
     fn test_jwt_config_valid() {
@@ -326,7 +334,7 @@ mod tests {
         assert!(cfg.validate().is_err());
     }
 
-    // --- LoggingConfig 校验 ---
+    // --- LoggingConfig validation ---
 
     #[test]
     fn test_logging_config_valid_json() {
@@ -364,7 +372,7 @@ mod tests {
         assert!(cfg.validate().is_err());
     }
 
-    // --- AppConfig 嵌套校验 ---
+    // --- AppConfig nested validation ---
 
     #[test]
     fn test_app_config_nested_validation_propagates() {
