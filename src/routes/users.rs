@@ -33,8 +33,11 @@ pub struct ListUsersQuery {
 /// Check whether `actor` (the authenticated user) is allowed to
 /// operate on `target_user_id`. Admins can only manage users who
 /// have the "user" role (not other admins or system_admins).
-async fn check_manage_scope(
-    db: &PgPool,
+///
+/// Accepts any executor (`&PgPool` or `&mut Transaction`) so the
+/// check can run inside a database transaction to avoid TOCTOU races.
+async fn check_manage_scope<'a>(
+    executor: impl sqlx::Executor<'a, Database = sqlx::Postgres>,
     actor: &JwtClaims,
     target_user_id: Uuid,
 ) -> Result<(), AppError> {
@@ -51,7 +54,7 @@ async fn check_manage_scope(
              WHERE ur.user_id = $1 AND r.name IN ('admin', 'system_admin')",
         )
         .bind(target_user_id)
-        .fetch_all(db)
+        .fetch_all(executor)
         .await?;
 
         if !dangerous_roles.is_empty() {
@@ -340,8 +343,11 @@ pub async fn update_user(
         .validate()
         .map_err(AppError::Validation)?;
 
-    // Scope check
-    check_manage_scope(&db, &claims, user_id).await?;
+    // Single transaction for scope check + role validation + profile + role updates
+    let mut tx = db.begin().await?;
+
+    // Scope check (inside transaction to avoid TOCTOU)
+    check_manage_scope(&mut *tx, &claims, user_id).await?;
 
     // Validate role assignment: admin cannot assign system_admin or admin roles
     if let Some(ref role_ids) = payload.role_ids
@@ -353,16 +359,13 @@ pub async fn update_user(
                  WHERE r.id = ANY($1) AND r.name IN ('admin', 'system_admin')",
             )
             .bind(role_ids)
-            .fetch_all(&db)
+            .fetch_all(&mut *tx)
             .await?;
 
         if !forbidden_roles.is_empty() {
             return Err(AppError::Forbidden);
         }
     }
-
-    // Single transaction for profile + role updates
-    let mut tx = db.begin().await?;
 
     // Check uniqueness (inside transaction)
     if let Some(ref email) = payload.email {
@@ -454,8 +457,11 @@ pub async fn delete_user(
         return Err(AppError::Forbidden);
     }
 
-    // Scope check
-    check_manage_scope(&db, &claims, user_id).await?;
+    // Single transaction for scope check + soft delete
+    let mut tx = db.begin().await?;
+
+    // Scope check (inside transaction to avoid TOCTOU)
+    check_manage_scope(&mut *tx, &claims, user_id).await?;
 
     let result = sqlx::query(
         "UPDATE users SET deleted_at = now(), deleted_by = $1
@@ -463,12 +469,14 @@ pub async fn delete_user(
     )
     .bind(claims.sub)
     .bind(user_id)
-    .execute(&db)
+    .execute(&mut *tx)
     .await?;
 
     if result.rows_affected() == 0 {
         return Err(AppError::not_found("用户"));
     }
+
+    tx.commit().await?;
 
     Ok(ApiResponse::success("删除成功", None))
 }

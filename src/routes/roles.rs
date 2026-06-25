@@ -11,11 +11,13 @@ use crate::response::ApiResponse;
 
 /// `GET /api/v1/roles`
 ///
-/// List all roles.
+/// List all roles. Requires `role:list` permission.
 pub async fn list_roles(
     State(db): State<PgPool>,
-    _auth: AuthUser,
+    AuthUser(claims): AuthUser,
 ) -> Result<ApiResponse<Vec<RoleRow>>, AppError> {
+    claims.require_permission("role:list")?;
+
     let roles = sqlx::query_as::<_, RoleRow>("SELECT * FROM roles ORDER BY created_at ASC")
         .fetch_all(&db)
         .await?;
@@ -25,12 +27,13 @@ pub async fn list_roles(
 
 /// `GET /api/v1/roles/:id`
 ///
-/// Get a role with its assigned permissions.
+/// Get a role with its assigned permissions. Requires `role:list` permission.
 pub async fn get_role(
     State(db): State<PgPool>,
-    _auth: AuthUser,
+    AuthUser(claims): AuthUser,
     Path(role_id): Path<Uuid>,
 ) -> Result<ApiResponse<RoleWithPermissions>, AppError> {
+    claims.require_permission("role:list")?;
     let role = sqlx::query_as::<_, RoleRow>("SELECT * FROM roles WHERE id = $1")
         .bind(role_id)
         .fetch_optional(&db)
