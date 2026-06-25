@@ -86,11 +86,27 @@ impl From<anyhow::Error> for AppError {
 
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
-        // Map unique constraint violations to Conflict for clear client errors
+        // Map unique-constraint violations (PostgreSQL code 23505) to
+        // user-friendly Conflict responses.  We parse the constraint name
+        // from the error rather than exposing the raw database message
+        // (which leaks table/column names).
         if let sqlx::Error::Database(db_err) = &e
             && db_err.code().as_deref() == Some("23505")
         {
-            let msg = db_err.message().to_string();
+            let constraint = db_err
+                .constraint()
+                .unwrap_or("unknown");
+
+            let msg = match constraint {
+                "idx_users_username" => "用户名已被占用".to_string(),
+                "idx_users_email" => "邮箱已被注册".to_string(),
+                "idx_users_phone" => "手机号已被注册".to_string(),
+                "idx_roles_name" => "角色名称已存在".to_string(),
+                "idx_permissions_resource_action" => {
+                    "该资源的此操作权限已存在".to_string()
+                }
+                _ => "资源已存在，请检查唯一字段".to_string(),
+            };
             return Self::Conflict(msg);
         }
         Self::Internal(e.into())
