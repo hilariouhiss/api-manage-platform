@@ -141,6 +141,23 @@ pub struct LoggingConfig {
 
     #[validate(custom(function = "validate_log_format"))]
     pub format: String,
+
+    /// Log output directory. Defaults to `./logs`.
+    #[serde(default = "default_log_dir")]
+    pub log_dir: String,
+
+    /// Log rotation strategy: `daily`, `hourly`, or `never`.
+    #[serde(default = "default_log_rotation")]
+    #[validate(custom(function = "validate_log_rotation"))]
+    pub log_rotation: String,
+}
+
+fn default_log_dir() -> String {
+    "./logs".into()
+}
+
+fn default_log_rotation() -> String {
+    "daily".into()
 }
 
 fn validate_log_level(level: &str) -> Result<(), validator::ValidationError> {
@@ -169,6 +186,23 @@ fn validate_log_format(format: &str) -> Result<(), validator::ValidationError> {
                 format!(
                     "logging.format must be one of: json, pretty; got '{}'",
                     format
+                )
+                .into(),
+            );
+            Err(err)
+        }
+    }
+}
+
+fn validate_log_rotation(rotation: &str) -> Result<(), validator::ValidationError> {
+    match rotation {
+        "daily" | "hourly" | "never" => Ok(()),
+        _ => {
+            let mut err = validator::ValidationError::new("invalid_log_rotation");
+            err.message = Some(
+                format!(
+                    "logging.log_rotation must be one of: daily, hourly, never; got '{}'",
+                    rotation
                 )
                 .into(),
             );
@@ -341,6 +375,8 @@ mod tests {
         let cfg = LoggingConfig {
             level: "info".into(),
             format: "json".into(),
+            log_dir: "./logs".into(),
+            log_rotation: "daily".into(),
         };
         assert!(cfg.validate().is_ok());
     }
@@ -350,6 +386,8 @@ mod tests {
         let cfg = LoggingConfig {
             level: "debug".into(),
             format: "pretty".into(),
+            log_dir: "./logs".into(),
+            log_rotation: "daily".into(),
         };
         assert!(cfg.validate().is_ok());
     }
@@ -359,6 +397,8 @@ mod tests {
         let cfg = LoggingConfig {
             level: "verbose".into(),
             format: "json".into(),
+            log_dir: "./logs".into(),
+            log_rotation: "daily".into(),
         };
         assert!(cfg.validate().is_err());
     }
@@ -368,8 +408,34 @@ mod tests {
         let cfg = LoggingConfig {
             level: "info".into(),
             format: "text".into(),
+            log_dir: "./logs".into(),
+            log_rotation: "daily".into(),
         };
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn test_logging_config_invalid_rotation() {
+        let cfg = LoggingConfig {
+            level: "info".into(),
+            format: "json".into(),
+            log_dir: "./logs".into(),
+            log_rotation: "weekly".into(),
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn test_logging_config_rotation_variants() {
+        for rotation in &["daily", "hourly", "never"] {
+            let cfg = LoggingConfig {
+                level: "info".into(),
+                format: "json".into(),
+                log_dir: "./logs".into(),
+                log_rotation: (*rotation).into(),
+            };
+            assert!(cfg.validate().is_ok(), "rotation '{}' should be valid", rotation);
+        }
     }
 
     // --- AppConfig nested validation ---
@@ -401,6 +467,8 @@ mod tests {
             logging: LoggingConfig {
                 level: "info".into(),
                 format: "json".into(),
+                log_dir: "./logs".into(),
+                log_rotation: "daily".into(),
             },
         };
         assert!(cfg.validate().is_err());

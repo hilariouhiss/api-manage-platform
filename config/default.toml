@@ -21,3 +21,5 @@ expiry_hours = 24
 [logging]
 level = "info"
 format = "json"
+log_dir = "./logs"
+log_rotation = "daily"

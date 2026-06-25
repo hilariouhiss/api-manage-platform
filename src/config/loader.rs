@@ -518,6 +518,113 @@ format = "json"
         );
     }
 
+    /// Test 14b: logging.log_dir and logging.log_rotation receive serde defaults
+    /// when absent from TOML and not overridden by environment variables.
+    #[test]
+    fn test_logging_default_fields() {
+        let (dir, _guard) = setup_config_dir(&[("default.toml", DEFAULT_TOML)]);
+        let _envs = setup_base_env(&dir);
+
+        let cfg = load().unwrap();
+        assert_eq!(cfg.logging.log_dir, "./logs");
+        assert_eq!(cfg.logging.log_rotation, "daily");
+    }
+
+    /// Test 14c: APP__LOGGING__LOG_DIR override works.
+    #[test]
+    fn test_logging_log_dir_env_override() {
+        let (dir, _guard) = setup_config_dir(&[("default.toml", DEFAULT_TOML)]);
+        let _envs = setup_base_env(&dir);
+        let _ld = set_env("APP__LOGGING__LOG_DIR", "/var/log/myapp");
+
+        let cfg = load().unwrap();
+        assert_eq!(cfg.logging.log_dir, "/var/log/myapp");
+        // log_rotation should still be the default
+        assert_eq!(cfg.logging.log_rotation, "daily");
+    }
+
+    /// Test 14d: APP__LOGGING__LOG_ROTATION with valid values (hourly, never).
+    #[test]
+    fn test_logging_log_rotation_env_override() {
+        for (value, expected) in &[("hourly", "hourly"), ("never", "never")] {
+            let (dir, _guard) = setup_config_dir(&[("default.toml", DEFAULT_TOML)]);
+            let _envs = setup_base_env(&dir);
+            let _lr = set_env("APP__LOGGING__LOG_ROTATION", value);
+
+            let cfg = load().unwrap();
+            assert_eq!(
+                cfg.logging.log_rotation, *expected,
+                "log_rotation should be '{}' when env var is '{}'",
+                expected, value
+            );
+            // log_dir should still be the default
+            assert_eq!(cfg.logging.log_dir, "./logs");
+        }
+    }
+
+    /// Test 14e: logging.log_rotation rejects invalid values via env var.
+    #[test]
+    fn test_logging_log_rotation_invalid_env_value_errors() {
+        let (dir, _guard) = setup_config_dir(&[("default.toml", DEFAULT_TOML)]);
+        let _envs = setup_base_env(&dir);
+        let _lr = set_env("APP__LOGGING__LOG_ROTATION", "weekly");
+
+        let result = load();
+        assert!(
+            result.is_err(),
+            "Invalid log rotation should cause validation error"
+        );
+    }
+
+    /// Test 14f: logging fields set via TOML are respected (not just defaults).
+    #[test]
+    fn test_logging_fields_from_toml() {
+        let toml_with_logging = r#"
+[server]
+host = "127.0.0.1"
+port = 3000
+
+[database]
+url = "postgres://localhost/db"
+max_connections = 10
+min_connections = 1
+acquire_timeout_seconds = 30
+idle_timeout_minutes = 30
+
+[valkey]
+url = "redis://localhost:6379"
+pool_size = 8
+connect_timeout_seconds = 10
+internal_command_timeout_seconds = 10
+
+[jwt]
+expiry_hours = 24
+
+[logging]
+level = "debug"
+format = "pretty"
+log_dir = "/custom/logs"
+log_rotation = "hourly"
+"#;
+        let (dir, _guard) = setup_config_dir(&[("default.toml", toml_with_logging)]);
+        // Use base env but clear any APP__LOGGING__* overrides
+        let _envs = setup_base_env(&dir);
+        let _cleanup: Vec<EnvGuard> = std::env::vars()
+            .filter(|(k, _)| k.starts_with("APP__LOGGING__"))
+            .map(|(k, _)| {
+                let prev = std::env::var(&k).ok();
+                unsafe { std::env::remove_var(&k) };
+                EnvGuard { key: k, prev }
+            })
+            .collect();
+
+        let cfg = load().unwrap();
+        assert_eq!(cfg.logging.level, "debug");
+        assert_eq!(cfg.logging.format, "pretty");
+        assert_eq!(cfg.logging.log_dir, "/custom/logs");
+        assert_eq!(cfg.logging.log_rotation, "hourly");
+    }
+
     /// Test 15: CONFIG_DIR override changes the config directory
     #[test]
     fn test_config_dir_override() {

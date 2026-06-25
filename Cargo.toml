@@ -31,15 +31,17 @@ anyhow = "1.0.102"
 
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "tracing"] }
+tracing-appender = "0.2.5"
 
 validator = { version = "0.20.0", features = ["derive"] }
 
-uuid = { version = "1.23.3", features = ["v7", "serde"] }
+uuid = { version = "1.23.4", features = ["v7", "serde"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 dotenvy = "0.15.7"
 config = "0.15.24"
 argon2 = "0.5.3"
 jsonwebtoken = "10.4.0"
+base64 = "0.22.1"
 
 # utoipa = { version = "5.5.0", features = ["axum_extras"] }
 # utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
