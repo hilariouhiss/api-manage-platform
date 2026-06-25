@@ -60,17 +60,25 @@ sqlx migrate run --database-url <DATABASE_URL>
 
 ```text
 src/
-├── main.rs          # 入口点：启动建连、路由注册、TCP listener
+├── main.rs          # 入口点：配置加载、tracing、连接池、关闭注册、路由、shutdown::run() 启动
+├── lib.rs           # 库 crate 根（api_manage_platform），重新导出所有模块供集成测试使用
 ├── state.rs         # AppState 聚合状态（FromRef derive）
-├── db.rs            # PostgreSQL 连接池初始化
-├── valkey.rs        # Valkey 连接池初始化
+├── db.rs            # PostgreSQL 连接池初始化（init_pool / close_pool）
+├── valkey.rs        # Valkey 连接池初始化（init_pool / close_pool）+ ValkeyPool 类型别名
 ├── response.rs      # 统一 API 响应封装 ApiResponse<T>
 ├── config/
 │   ├── mod.rs       # AppConfig 聚合结构体 + SharedConfig 类型别名
 │   └── loader.rs    # 多源配置加载（default.toml → {APP_ENV}.toml → env）
+├── shutdown/
+│   ├── mod.rs       # init_tracing()、GracefulShutdownConfig、两级关闭的 run()
+│   ├── registry.rs  # ShutdownRegistry — 资源按 LIFO 顺序清理，错误隔离
+│   └── signals.rs   # 跨平台信号监听（SIGINT、SIGTERM、SIGHUP）
 └── routes/
     ├── mod.rs       # 路由模块声明
     └── hello.rs     # 示例端点 GET /api/v1/hello
+
+tests/
+└── integration_test.rs  # 使用 tower::ServiceExt::oneshot() 的无服务器路由测试
 
 config/
 ├── default.toml      # 默认配置（不含 secrets）
@@ -83,7 +91,9 @@ config/
 ### 核心模式
 
 - **状态注入**：使用 `AppState` + `#[derive(FromRef)]` 作为 axum 单一顶层 State。Handler 可按需提取子状态：`State<PgPool>`、`State<SharedConfig>`、`State<ValkeyPool>`。`axum` 需要启用 `macros` feature。
+- **优雅关闭（两级）**：信号到达后，axum 开始排空进行中的请求（有 `drain_timeout` 保护，默认 10 秒）。资源按 LIFO 顺序通过 `ShutdownRegistry` 清理。无论服务器如何退出，清理始终运行。
 - **配置注入**：`config::load()` → `SharedConfig`（`Arc<AppConfig>`）→ 存入 `AppState.config`。
+- **集成测试**：使用 `tower::ServiceExt::oneshot()` 测试 axum 路由——无需运行服务器。导入来自 `api_manage_platform` crate（通过 `lib.rs` 公开）。
 - **统一响应格式**：所有 API 端点返回 `ApiResponse<T>`（定义在 `src/response.rs`），包含 `code`、`message`、`data` 字段。提供了 `success()`、`ok()`、`failure()`、`message()` 工厂方法。`ApiResponse` 实现了 `IntoResponse`，自动序列化为 JSON。
 - **环境变量格式**：`APP__` 前缀 + `__` 分隔符 → 嵌套结构体。如 `APP__SERVER__PORT=8080` → `server.port`。
 - **配置加载顺序**：`default.toml` → `{APP_ENV}.toml`（可选）→ 环境变量 `APP__*`（最高优先级）。
@@ -103,7 +113,7 @@ config/
 
 ## 开发约定
 
-- **启动流程**：tracing init → config::load() → db::init_pool() → valkey::init_pool() → AppState → Router → serve。连接失败使用 `.inspect_err(\|e\| tracing::error!(…))` 记录日志后退出，fail-fast 不延迟连接。
+- **启动流程**：config::load() → shutdown::init_tracing() → db::init_pool() → valkey::init_pool() → ShutdownRegistry → AppState → 路由 → shutdown::run(listener, app, registry, config)。连接失败使用 `.inspect_err(\|e\| tracing::error!(…))` 记录日志后退出，fail-fast 不延迟连接。
 - **首次运行**：`cp .env.example .env` → 设置 `APP_ENV` 和 `APP__JWT__SECRET` → `cargo run`
 - **环境变量测试**：`cargo test -- --test-threads=1`（`set_var`/`remove_var` 在 Rust 2024 中为 `unsafe`，测试必须串行）
 - **Secrets**：`jwt.secret` 不写入 TOML，必须通过 `APP__JWT__SECRET` 注入。`#[serde(default)]` + validator `length(min=32)` + loader 显式检查三重保证
