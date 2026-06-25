@@ -5,6 +5,8 @@ use api_manage_platform::shutdown;
 use api_manage_platform::valkey;
 
 use anyhow::Context;
+use axum::routing::{delete, get, post, put};
+use sqlx::PgPool;
 
 use api_manage_platform::state::AppState;
 
@@ -15,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let shared_config = config::SharedConfig::new(app_config);
 
     // --- Tracing ---
-    let _tracing_guard = shutdown::init_tracing()?;
+    let _tracing_guard = shutdown::init_tracing(&shared_config.logging)?;
 
     // --- Database ---
     let db_pool = db::init_pool(&shared_config.database)
@@ -27,6 +29,9 @@ async fn main() -> anyhow::Result<()> {
         shared_config.database.min_connections,
         shared_config.database.max_connections
     );
+
+    // --- Run migrations ---
+    run_migrations(&db_pool).await?;
 
     // --- Valkey ---
     let valkey_pool = valkey::init_pool(&shared_config.valkey)
@@ -75,7 +80,24 @@ async fn main() -> anyhow::Result<()> {
 
     // --- Routes ---
     let app = axum::Router::new()
-        .route("/api/v1/hello", axum::routing::get(routes::hello::hello))
+        // Health check
+        .route("/api/v1/hello", get(routes::hello::hello))
+        // Auth
+        .route("/api/v1/auth/register", post(routes::auth::register))
+        .route("/api/v1/auth/login", post(routes::auth::login))
+        // Current user
+        .route("/api/v1/users/me", get(routes::users::me))
+        .route("/api/v1/users/me", put(routes::users::update_me))
+        // User CRUD
+        .route("/api/v1/users", get(routes::users::list_users))
+        .route("/api/v1/users", post(routes::users::create_user))
+        .route("/api/v1/users/{id}", get(routes::users::get_user))
+        .route("/api/v1/users/{id}", put(routes::users::update_user))
+        .route("/api/v1/users/{id}", delete(routes::users::delete_user))
+        // Roles & Permissions
+        .route("/api/v1/roles", get(routes::roles::list_roles))
+        .route("/api/v1/roles/{id}", get(routes::roles::get_role))
+        .route("/api/v1/permissions", get(routes::permissions::list_permissions))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&addr)
@@ -91,4 +113,15 @@ async fn main() -> anyhow::Result<()> {
         shutdown::GracefulShutdownConfig::default(),
     )
     .await
+}
+
+/// Run SQL migrations at startup.
+async fn run_migrations(pool: &PgPool) -> anyhow::Result<()> {
+    tracing::info!("running database migrations");
+    sqlx::migrate!("./migrations")
+        .run(pool)
+        .await
+        .context("failed to run database migrations")?;
+    tracing::info!("database migrations complete");
+    Ok(())
 }

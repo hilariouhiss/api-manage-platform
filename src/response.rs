@@ -4,6 +4,7 @@
 //! together with convenience constructors and an [`axum::response::IntoResponse`]
 //! implementation.
 
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::Serialize;
 
@@ -19,7 +20,7 @@ impl<T: Serialize> ApiResponse<T> {
     /// Create a success response without data.
     pub fn ok() -> Self {
         Self {
-            code: 200,
+            code: StatusCode::OK.as_u16(),
             message: "success".to_string(),
             data: None,
         }
@@ -28,16 +29,18 @@ impl<T: Serialize> ApiResponse<T> {
     /// Create a success response with optional data.
     pub fn success(message: impl Into<String>, data: Option<T>) -> Self {
         Self {
-            code: 200,
+            code: StatusCode::OK.as_u16(),
             message: message.into(),
             data,
         }
     }
 
     /// Create a failure response without data.
-    pub fn failure(code: u16, message: impl Into<String>) -> Self {
+    ///
+    /// Accepts [`StatusCode`] enum for type safety.
+    pub fn failure(status: StatusCode, message: impl Into<String>) -> Self {
         Self {
-            code,
+            code: status.as_u16(),
             message: message.into(),
             data: None,
         }
@@ -94,7 +97,8 @@ mod tests {
 
     #[test]
     fn test_failure_returns_custom_code_and_message() {
-        let resp: ApiResponse<()> = ApiResponse::failure(404, "Not Found");
+        let resp: ApiResponse<()> =
+            ApiResponse::failure(StatusCode::NOT_FOUND, "Not Found");
         assert_eq!(resp.code, 404);
         assert_eq!(resp.message, "Not Found");
         assert!(resp.data.is_none());
@@ -102,7 +106,8 @@ mod tests {
 
     #[test]
     fn test_failure_with_500() {
-        let resp: ApiResponse<()> = ApiResponse::failure(500, "Internal Server Error");
+        let resp: ApiResponse<()> =
+            ApiResponse::failure(StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error");
         assert_eq!(resp.code, 500);
         assert_eq!(resp.message, "Internal Server Error");
     }
