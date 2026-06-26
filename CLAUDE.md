@@ -65,7 +65,20 @@ src/
 ├── state.rs         # AppState 聚合状态（FromRef derive）
 ├── db.rs            # PostgreSQL 连接池初始化（init_pool / close_pool）
 ├── valkey.rs        # Valkey 连接池初始化（init_pool / close_pool）+ ValkeyPool 类型别名
+├── errors.rs        # AppError 枚举 + IntoResponse + From<sqlx::Error> (23505→中文消息)
 ├── response.rs      # 统一 API 响应封装 ApiResponse<T>
+├── auth/
+│   ├── mod.rs       # 认证模块声明
+│   ├── jwt.rs       # JWT 签发/验证 (HS256)
+│   └── password.rs  # argon2 密码哈希/校验
+├── middleware/
+│   ├── mod.rs       # 中间件模块声明
+│   └── auth.rs      # AuthUser FromRequestParts 提取器
+├── models/
+│   ├── mod.rs       # 模型模块声明
+│   ├── auth.rs      # JwtClaims, RegisterPayload, LoginPayload, TokenResponse
+│   ├── user.rs      # UserRow, UserResponse, UserListItem, 分页类型, 请求 DTO
+│   └── role.rs      # RoleRow, PermissionRow, RoleWithPermissions
 ├── config/
 │   ├── mod.rs       # AppConfig 聚合结构体 + SharedConfig 类型别名
 │   └── loader.rs    # 多源配置加载（default.toml → {APP_ENV}.toml → env）
@@ -75,7 +88,11 @@ src/
 │   └── signals.rs   # 跨平台信号监听（SIGINT、SIGTERM、SIGHUP）
 └── routes/
     ├── mod.rs       # 路由模块声明
-    └── hello.rs     # 示例端点 GET /api/v1/hello
+    ├── hello.rs     # GET /api/v1/hello
+    ├── auth.rs      # POST register, POST login
+    ├── users.rs     # CRUD /users, /users/me, 分页, check_manage_scope
+    ├── roles.rs     # GET /roles, GET /roles/:id
+    └── permissions.rs # GET /permissions
 
 tests/
 └── integration_test.rs  # 使用 tower::ServiceExt::oneshot() 的无服务器路由测试
@@ -90,6 +107,11 @@ config/
 
 ### 核心模式
 
+- **RBAC 鉴权**：roles + permissions 扁平化嵌入 JWT Claims，运行时 `require_permission("resource:action")` 零查库。权限格式 `"{resource}:{action}"`。三级管理范围：system_admin（全部）> admin（仅 user 角色用户）> user（仅自身）。
+- **防 TOCTOU**：管理范围检查 (`check_manage_scope`) + 角色分配验证 + 唯一性检查全在同一事务内执行。
+- **数据库错误映射**：`From<sqlx::Error> for AppError` 对 PG 23505 按约束名映射中文消息，不泄露表/列名。
+- **软删除**：用户删除设 `deleted_at` + `deleted_by`；唯一索引带 `WHERE deleted_at IS NULL`；所有查询过滤软删除行。
+- **游标分页**：keyset `(created_at DESC, id DESC)`，游标 base64url 编码，取 limit+1 行判断 has_more。
 - **状态注入**：使用 `AppState` + `#[derive(FromRef)]` 作为 axum 单一顶层 State。Handler 可按需提取子状态：`State<PgPool>`、`State<SharedConfig>`、`State<ValkeyPool>`。`axum` 需要启用 `macros` feature。
 - **优雅关闭（两级）**：信号到达后，axum 开始排空进行中的请求（有 `drain_timeout` 保护，默认 10 秒）。资源按 LIFO 顺序通过 `ShutdownRegistry` 清理。无论服务器如何退出，清理始终运行。
 - **配置注入**：`config::load()` → `SharedConfig`（`Arc<AppConfig>`）→ 存入 `AppState.config`。
@@ -99,20 +121,14 @@ config/
 - **配置加载顺序**：`default.toml` → `{APP_ENV}.toml`（可选）→ 环境变量 `APP__*`（最高优先级）。
 - **Rust edition 2024**：项目使用 Rust 2024 edition。`std::env::set_var` / `remove_var` 在此 edition 中为 `unsafe`。
 
-### 依赖规划
+### 文档
 
-依赖列表表明项目规划支持：
-
-- **数据库操作**（sqlx + PostgreSQL，含迁移支持）
-- **Redis 缓存**（fred）
-- **用户认证**（argon2 密码哈希 + JWT token）
-- **配置管理**（config + dotenvy）
-- **请求校验**（validator）
-- **分布式追踪/日志**（tracing + tracing-subscriber，JSON 格式输出）
-- **OpenAPI 文档**（utoipa / utoipa-swagger-ui 已注释，后续启用）
+- `docs/architecture-design.md` — 架构设计（技术选型、横切关注点、模块职责、数据流）
+- `docs/detailed-design.md` — 详细设计索引，链接到 `docs/detailed-design/` 下 per-module 子文档
 
 ## 开发约定
 
+- **SQL 索引命名**：`pk_` 主键 | `uk_` 唯一 | `idx_` 普通 | `fk_` 外键（如 `uk_users_email`、`idx_users_cursor`、`fk_user_roles_user_id`）
 - **启动流程**：config::load() → shutdown::init_tracing() → db::init_pool() → valkey::init_pool() → ShutdownRegistry → AppState → 路由 → shutdown::run(listener, app, registry, config)。连接失败使用 `.inspect_err(\|e\| tracing::error!(…))` 记录日志后退出，fail-fast 不延迟连接。
 - **首次运行**：`cp .env.example .env` → 设置 `APP_ENV` 和 `APP__JWT__SECRET` → `cargo run`
 - **环境变量测试**：`cargo test -- --test-threads=1`（`set_var`/`remove_var` 在 Rust 2024 中为 `unsafe`，测试必须串行）
