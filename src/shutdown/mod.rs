@@ -284,8 +284,7 @@ mod tests {
     /// - `daily` rotation strategy
     #[test]
     fn init_tracing_full_pipeline() {
-        let tmp = std::env::temp_dir()
-            .join(format!("tracing-test-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("tracing-test-{}", std::process::id()));
         let _cleanup = TempDirGuard(tmp.clone());
 
         // ── Step 1: init with "daily" rotation ──────────────────
@@ -318,8 +317,7 @@ mod tests {
     /// the full-pipeline test.
     #[test]
     fn init_tracing_rejects_invalid_rotation() {
-        let tmp = std::env::temp_dir()
-            .join(format!("tracing-test-rot-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("tracing-test-rot-{}", std::process::id()));
         let _cleanup = TempDirGuard(tmp.clone());
 
         let cfg = test_logging_config(&tmp.to_string_lossy(), "weekly");
@@ -336,8 +334,7 @@ mod tests {
     /// Error path: log directory cannot be created (e.g. path is a file).
     #[test]
     fn init_tracing_fails_when_log_dir_is_inaccessible() {
-        let tmp = std::env::temp_dir()
-            .join(format!("tracing-test-dir-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("tracing-test-dir-{}", std::process::id()));
         let _cleanup = TempDirGuard(tmp.clone());
 
         // Create the temporary parent directory first
@@ -360,8 +357,7 @@ mod tests {
     /// also works for other garbage rotation values.
     #[test]
     fn init_tracing_rejects_garbage_rotation_values() {
-        let tmp = std::env::temp_dir()
-            .join(format!("tracing-test-gbg-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("tracing-test-gbg-{}", std::process::id()));
         let _cleanup = TempDirGuard(tmp.clone());
 
         for garbage in &["", "DAILY", "Daily", "monthly", "minutely"] {

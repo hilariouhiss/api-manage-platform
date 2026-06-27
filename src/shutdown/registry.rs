@@ -7,7 +7,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
-type CleanupFn = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send>;
+type CleanupFn =
+    Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send>;
 
 struct ShutdownEntry {
     name: &'static str,
@@ -26,7 +27,9 @@ pub struct ShutdownRegistry {
 impl ShutdownRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Register a cleanup task.
@@ -87,12 +90,15 @@ mod tests {
 
         for name in ["first", "second", "third"] {
             let order = order.clone();
-            registry.register(name, Box::new(move || {
-                Box::pin(async move {
-                    order.lock().unwrap().push(name);
-                    Ok(())
-                })
-            }));
+            registry.register(
+                name,
+                Box::new(move || {
+                    Box::pin(async move {
+                        order.lock().unwrap().push(name);
+                        Ok(())
+                    })
+                }),
+            );
         }
 
         registry.cleanup().await;
@@ -109,21 +115,27 @@ mod tests {
 
         // Register a task that fails
         let order_clone = order.clone();
-        registry.register("failing", Box::new(move || {
-            Box::pin(async move {
-                order_clone.lock().unwrap().push("failing");
-                anyhow::bail!("simulated failure")
-            })
-        }));
+        registry.register(
+            "failing",
+            Box::new(move || {
+                Box::pin(async move {
+                    order_clone.lock().unwrap().push("failing");
+                    anyhow::bail!("simulated failure")
+                })
+            }),
+        );
 
         // Register a task that succeeds (registered later, runs first)
         let order_clone = order.clone();
-        registry.register("succeeding", Box::new(move || {
-            Box::pin(async move {
-                order_clone.lock().unwrap().push("succeeding");
-                Ok(())
-            })
-        }));
+        registry.register(
+            "succeeding",
+            Box::new(move || {
+                Box::pin(async move {
+                    order_clone.lock().unwrap().push("succeeding");
+                    Ok(())
+                })
+            }),
+        );
 
         registry.cleanup().await;
 
@@ -147,9 +159,7 @@ mod tests {
     #[tokio::test]
     async fn single_entry_registers_and_cleans_up() {
         let mut registry = ShutdownRegistry::new();
-        registry.register("only", Box::new(|| {
-            Box::pin(async { Ok(()) })
-        }));
+        registry.register("only", Box::new(|| Box::pin(async { Ok(()) })));
         registry.cleanup().await; // must not panic
     }
 }

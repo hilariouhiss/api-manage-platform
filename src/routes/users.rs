@@ -1,7 +1,7 @@
 //! User management routes: CRUD, self-profile, and paginated listing.
 
-use axum::extract::{Path, Query, State};
 use axum::Json;
+use axum::extract::{Path, Query, State};
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -11,8 +11,8 @@ use crate::errors::AppError;
 use crate::middleware::auth::AuthUser;
 use crate::models::auth::JwtClaims;
 use crate::models::user::{
-    CreateUserPayload, PaginatedResponse, UpdateUserPayload, UserCursor,
-    UserListItem, UserResponse, UserRow,
+    CreateUserPayload, PaginatedResponse, UpdateUserPayload, UserCursor, UserListItem,
+    UserResponse, UserRow,
 };
 use crate::response::ApiResponse;
 
@@ -75,13 +75,12 @@ pub async fn me(
     State(db): State<PgPool>,
     AuthUser(claims): AuthUser,
 ) -> Result<ApiResponse<UserResponse>, AppError> {
-    let row = sqlx::query_as::<_, UserRow>(
-        "SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL",
-    )
-    .bind(claims.sub)
-    .fetch_optional(&db)
-    .await?
-    .ok_or_else(|| AppError::not_found("用户"))?;
+    let row =
+        sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL")
+            .bind(claims.sub)
+            .fetch_optional(&db)
+            .await?
+            .ok_or_else(|| AppError::not_found("用户"))?;
 
     Ok(ApiResponse::success("success", Some(row.into())))
 }
@@ -100,9 +99,7 @@ pub async fn update_me(
         return Err(AppError::Forbidden);
     }
 
-    payload
-        .validate()
-        .map_err(AppError::Validation)?;
+    payload.validate().map_err(AppError::Validation)?;
 
     // Check uniqueness constraints
     if let Some(ref email) = payload.email {
@@ -170,10 +167,7 @@ pub async fn list_users(
 ) -> Result<ApiResponse<PaginatedResponse<UserListItem>>, AppError> {
     claims.require_permission("user:list")?;
 
-    let limit = params
-        .limit
-        .unwrap_or(DEFAULT_LIMIT)
-        .clamp(1, MAX_LIMIT);
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
 
     // Fetch one extra row to determine has_more
     let fetch_limit = limit + 1;
@@ -245,13 +239,12 @@ pub async fn get_user(
 ) -> Result<ApiResponse<UserResponse>, AppError> {
     claims.require_permission("user:list")?;
 
-    let row = sqlx::query_as::<_, UserRow>(
-        "SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL",
-    )
-    .bind(user_id)
-    .fetch_optional(&db)
-    .await?
-    .ok_or_else(|| AppError::not_found("用户"))?;
+    let row =
+        sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL")
+            .bind(user_id)
+            .fetch_optional(&db)
+            .await?
+            .ok_or_else(|| AppError::not_found("用户"))?;
 
     Ok(ApiResponse::success("success", Some(row.into())))
 }
@@ -266,9 +259,7 @@ pub async fn create_user(
 ) -> Result<ApiResponse<UserResponse>, AppError> {
     claims.require_permission("user:create")?;
 
-    payload
-        .validate()
-        .map_err(AppError::Validation)?;
+    payload.validate().map_err(AppError::Validation)?;
 
     let password_hash =
         crate::auth::password::hash_password(&payload.password).map_err(AppError::Internal)?;
@@ -339,9 +330,7 @@ pub async fn update_user(
 ) -> Result<ApiResponse<UserResponse>, AppError> {
     claims.require_permission("user:manage")?;
 
-    payload
-        .validate()
-        .map_err(AppError::Validation)?;
+    payload.validate().map_err(AppError::Validation)?;
 
     // Single transaction for scope check + role validation + profile + role updates
     let mut tx = db.begin().await?;
@@ -354,13 +343,13 @@ pub async fn update_user(
         && !role_ids.is_empty()
         && !claims.has_role("system_admin")
     {
-            let forbidden_roles: Vec<String> = sqlx::query_scalar(
-                "SELECT r.name FROM roles r
+        let forbidden_roles: Vec<String> = sqlx::query_scalar(
+            "SELECT r.name FROM roles r
                  WHERE r.id = ANY($1) AND r.name IN ('admin', 'system_admin')",
-            )
-            .bind(role_ids)
-            .fetch_all(&mut *tx)
-            .await?;
+        )
+        .bind(role_ids)
+        .fetch_all(&mut *tx)
+        .await?;
 
         if !forbidden_roles.is_empty() {
             return Err(AppError::Forbidden);

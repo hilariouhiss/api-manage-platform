@@ -55,22 +55,15 @@ impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         let (status, message) = match &self {
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
-            AppError::Unauthorized => {
-                (StatusCode::UNAUTHORIZED, "未认证或 token 无效".to_string())
-            }
-            AppError::Forbidden => {
-                (StatusCode::FORBIDDEN, "无权限执行此操作".to_string())
-            }
-            AppError::NotFound(resource) => {
-                (StatusCode::NOT_FOUND, format!("{} 不存在", resource))
-            }
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "未认证或 token 无效".to_string()),
+            AppError::Forbidden => (StatusCode::FORBIDDEN, "无权限执行此操作".to_string()),
+            AppError::NotFound(resource) => (StatusCode::NOT_FOUND, format!("{} 不存在", resource)),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
-            AppError::Validation(errors) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, errors.to_string())
-            }
-            AppError::Internal(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "服务器内部错误".to_string())
-            }
+            AppError::Validation(errors) => (StatusCode::UNPROCESSABLE_ENTITY, errors.to_string()),
+            AppError::Internal(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "服务器内部错误".to_string(),
+            ),
         };
 
         let body: ApiResponse<()> = ApiResponse::failure(status, message);
@@ -93,18 +86,14 @@ impl From<sqlx::Error> for AppError {
         if let sqlx::Error::Database(db_err) = &e
             && db_err.code().as_deref() == Some("23505")
         {
-            let constraint = db_err
-                .constraint()
-                .unwrap_or("unknown");
+            let constraint = db_err.constraint().unwrap_or("unknown");
 
             let msg = match constraint {
                 "idx_users_username" => "用户名已被占用".to_string(),
                 "idx_users_email" => "邮箱已被注册".to_string(),
                 "idx_users_phone" => "手机号已被注册".to_string(),
                 "idx_roles_name" => "角色名称已存在".to_string(),
-                "idx_permissions_resource_action" => {
-                    "该资源的此操作权限已存在".to_string()
-                }
+                "idx_permissions_resource_action" => "该资源的此操作权限已存在".to_string(),
                 _ => "资源已存在，请检查唯一字段".to_string(),
             };
             return Self::Conflict(msg);

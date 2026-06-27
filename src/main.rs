@@ -55,21 +55,28 @@ async fn main() -> anyhow::Result<()> {
 
     let mut registry = shutdown::ShutdownRegistry::new();
     // Register in reverse shutdown order: tracing first → cleaned up last
-    registry.register("tracing", Box::new(move || {
-        Box::pin(async move {
-            drop(_tracing_guard);
-            Ok(())
-        })
-    }));
-    registry.register("database", Box::new(move || {
-        Box::pin(async move {
-            db::close_pool(&db_cleanup).await;
-            Ok(())
-        })
-    }));
-    registry.register("valkey", Box::new(move || {
-        Box::pin(async move { valkey::close_pool(&valkey_cleanup).await })
-    }));
+    registry.register(
+        "tracing",
+        Box::new(move || {
+            Box::pin(async move {
+                drop(_tracing_guard);
+                Ok(())
+            })
+        }),
+    );
+    registry.register(
+        "database",
+        Box::new(move || {
+            Box::pin(async move {
+                db::close_pool(&db_cleanup).await;
+                Ok(())
+            })
+        }),
+    );
+    registry.register(
+        "valkey",
+        Box::new(move || Box::pin(async move { valkey::close_pool(&valkey_cleanup).await })),
+    );
 
     // --- Application state ---
     let state = AppState {
@@ -81,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
     // --- Routes ---
     let app = axum::Router::new()
         // Health check
-        .route("/api/v1/hello", get(routes::hello::hello))
+        .route("/api/v1/health", get(routes::health::health_check))
         // Auth
         .route("/api/v1/auth/register", post(routes::auth::register))
         .route("/api/v1/auth/login", post(routes::auth::login))
@@ -97,7 +104,10 @@ async fn main() -> anyhow::Result<()> {
         // Roles & Permissions
         .route("/api/v1/roles", get(routes::roles::list_roles))
         .route("/api/v1/roles/{id}", get(routes::roles::get_role))
-        .route("/api/v1/permissions", get(routes::permissions::list_permissions))
+        .route(
+            "/api/v1/permissions",
+            get(routes::permissions::list_permissions),
+        )
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&addr)

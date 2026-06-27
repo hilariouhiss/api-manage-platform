@@ -10,4 +10,4 @@ pub mod shutdown;
 pub mod state;
 pub mod valkey;
 
-pub use routes::hello::hello;
+pub use routes::health::health_check;

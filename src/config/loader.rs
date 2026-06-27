@@ -159,7 +159,10 @@ mod tests {
         guards.push(set_env("SKIP_DOTENV", "1"));
         guards.push(set_env("CONFIG_DIR", &dir.to_string_lossy()));
         guards.push(set_env("APP_ENV", "development"));
-        guards.push(set_env("APP__JWT__SECRET", "a-strong-secret-at-least-32-chars!!"));
+        guards.push(set_env(
+            "APP__JWT__SECRET",
+            "a-strong-secret-at-least-32-chars!!",
+        ));
         guards.push(set_env("APP__SERVER__HOST", "127.0.0.1"));
         guards
     }

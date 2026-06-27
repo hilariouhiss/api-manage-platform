@@ -52,9 +52,6 @@ pub async fn get_role(
 
     Ok(ApiResponse::success(
         "success",
-        Some(RoleWithPermissions {
-            role,
-            permissions,
-        }),
+        Some(RoleWithPermissions { role, permissions }),
     ))
 }

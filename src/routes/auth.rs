@@ -1,7 +1,7 @@
 //! Authentication routes: register and login.
 
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use validator::Validate;
@@ -20,9 +20,7 @@ pub async fn register(
     Json(payload): Json<RegisterPayload>,
 ) -> Result<ApiResponse<TokenResponse>, AppError> {
     // Validate payload
-    payload
-        .validate()
-        .map_err(AppError::Validation)?;
+    payload.validate().map_err(AppError::Validation)?;
 
     // Hash password
     let password_hash =
@@ -99,17 +97,11 @@ pub async fn register(
     .await?;
 
     // Create JWT
-    let token = crate::auth::jwt::create_token(
-        &config,
-        user_id,
-        &payload.username,
-        roles,
-        permissions,
-    )
-    .map_err(AppError::Internal)?;
+    let token =
+        crate::auth::jwt::create_token(&config, user_id, &payload.username, roles, permissions)
+            .map_err(AppError::Internal)?;
 
-    let expires_at = Utc::now()
-        + Duration::hours(config.jwt.expiry_hours as i64);
+    let expires_at = Utc::now() + Duration::hours(config.jwt.expiry_hours as i64);
 
     Ok(ApiResponse::success(
         "注册成功",
@@ -125,9 +117,7 @@ pub async fn login(
     State(config): State<crate::config::SharedConfig>,
     Json(payload): Json<LoginPayload>,
 ) -> Result<ApiResponse<TokenResponse>, AppError> {
-    payload
-        .validate()
-        .map_err(AppError::Validation)?;
+    payload.validate().map_err(AppError::Validation)?;
 
     // Look up user
     let user: Option<(uuid::Uuid, String, String)> = sqlx::query_as(
@@ -138,8 +128,7 @@ pub async fn login(
     .fetch_optional(&db)
     .await?;
 
-    let (user_id, username, password_hash) =
-        user.ok_or_else(|| AppError::Unauthorized)?;
+    let (user_id, username, password_hash) = user.ok_or_else(|| AppError::Unauthorized)?;
 
     // Verify password
     let valid = crate::auth::password::verify_password(&payload.password, &password_hash)
@@ -171,13 +160,10 @@ pub async fn login(
     .await?;
 
     // Create JWT
-    let token = crate::auth::jwt::create_token(
-        &config, user_id, &username, roles, permissions,
-    )
-    .map_err(AppError::Internal)?;
+    let token = crate::auth::jwt::create_token(&config, user_id, &username, roles, permissions)
+        .map_err(AppError::Internal)?;
 
-    let expires_at = Utc::now()
-        + Duration::hours(config.jwt.expiry_hours as i64);
+    let expires_at = Utc::now() + Duration::hours(config.jwt.expiry_hours as i64);
 
     Ok(ApiResponse::success(
         "登录成功",

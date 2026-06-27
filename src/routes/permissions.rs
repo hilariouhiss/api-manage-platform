@@ -17,11 +17,9 @@ pub async fn list_permissions(
 ) -> Result<ApiResponse<Vec<PermissionRow>>, AppError> {
     claims.require_permission("permission:list")?;
     let permissions =
-        sqlx::query_as::<_, PermissionRow>(
-            "SELECT * FROM permissions ORDER BY resource, action",
-        )
-        .fetch_all(&db)
-        .await?;
+        sqlx::query_as::<_, PermissionRow>("SELECT * FROM permissions ORDER BY resource, action")
+            .fetch_all(&db)
+            .await?;
 
     Ok(ApiResponse::success("success", Some(permissions)))
 }

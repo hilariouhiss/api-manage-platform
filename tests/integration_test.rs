@@ -2,22 +2,44 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
 
-use api_manage_platform::hello;
+use api_manage_platform::config;
+use api_manage_platform::db;
+use api_manage_platform::health_check;
+use api_manage_platform::state::AppState;
+use api_manage_platform::valkey;
 
-/// Build a minimal test router containing only the hello endpoint.
-/// No database or Valkey state is required — the handler is stateless.
-fn test_app() -> axum::Router {
-    axum::Router::new().route("/api/v1/hello", axum::routing::get(hello))
+/// Build a test router for the health check endpoint with real state.
+async fn test_app() -> axum::Router {
+    let app_config = config::load().expect("failed to load config");
+    let shared_config = config::SharedConfig::new(app_config);
+
+    let db_pool = db::init_pool(&shared_config.database)
+        .await
+        .expect("failed to init db pool");
+
+    let valkey_pool = valkey::init_pool(&shared_config.valkey)
+        .await
+        .expect("failed to init valkey pool");
+
+    let state = AppState {
+        config: shared_config,
+        db: db_pool,
+        valkey: valkey_pool,
+    };
+
+    axum::Router::new()
+        .route("/api/v1/health", axum::routing::get(health_check))
+        .with_state(state)
 }
 
 #[tokio::test]
-async fn test_hello_returns_200() {
-    let app = test_app();
+async fn test_health_returns_200() {
+    let app = test_app().await;
 
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/hello")
+                .uri("/api/v1/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -28,13 +50,13 @@ async fn test_hello_returns_200() {
 }
 
 #[tokio::test]
-async fn test_hello_has_json_content_type() {
-    let app = test_app();
+async fn test_health_has_json_content_type() {
+    let app = test_app().await;
 
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/hello")
+                .uri("/api/v1/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -56,13 +78,13 @@ async fn test_hello_has_json_content_type() {
 }
 
 #[tokio::test]
-async fn test_hello_response_body() {
-    let app = test_app();
+async fn test_health_response_body() {
+    let app = test_app().await;
 
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/hello")
+                .uri("/api/v1/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -75,19 +97,23 @@ async fn test_hello_response_body() {
     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
     assert_eq!(body["code"], 200);
-    assert_eq!(body["message"], "Hello World!");
-    assert_eq!(body["data"], serde_json::Value::Null);
+    assert_eq!(body["message"], "health check passed");
+
+    let data = &body["data"];
+    assert_eq!(data["status"], "healthy");
+    assert_eq!(data["database"], "connected");
+    assert_eq!(data["valkey"], "connected");
 }
 
 #[tokio::test]
-async fn test_hello_post_returns_405() {
-    let app = test_app();
+async fn test_health_post_returns_405() {
+    let app = test_app().await;
 
     let response = app
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/hello")
+                .uri("/api/v1/health")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -99,7 +125,7 @@ async fn test_hello_post_returns_405() {
 
 #[tokio::test]
 async fn test_unknown_route_returns_404() {
-    let app = test_app();
+    let app = test_app().await;
 
     let response = app
         .oneshot(
@@ -116,15 +142,10 @@ async fn test_unknown_route_returns_404() {
 
 #[tokio::test]
 async fn test_root_returns_404() {
-    let app = test_app();
+    let app = test_app().await;
 
     let response = app
-        .oneshot(
-            Request::builder()
-                .uri("/")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
         .await
         .unwrap();
 

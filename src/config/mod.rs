@@ -434,7 +434,11 @@ mod tests {
                 log_dir: "./logs".into(),
                 log_rotation: (*rotation).into(),
             };
-            assert!(cfg.validate().is_ok(), "rotation '{}' should be valid", rotation);
+            assert!(
+                cfg.validate().is_ok(),
+                "rotation '{}' should be valid",
+                rotation
+            );
         }
     }
 

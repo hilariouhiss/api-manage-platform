@@ -95,11 +95,7 @@ impl From<UserRow> for UserListItem {
 /// POST /api/v1/users (admin creates a user)
 #[derive(Debug, Deserialize, validator::Validate)]
 pub struct CreateUserPayload {
-    #[validate(length(
-        min = 1,
-        max = 100,
-        message = "展示名不能为空，最多 100 个字符"
-    ))]
+    #[validate(length(min = 1, max = 100, message = "展示名不能为空，最多 100 个字符"))]
     pub display_name: String,
 
     #[validate(length(min = 3, max = 50, message = "用户名长度需在 3-50 之间"))]
@@ -121,11 +117,7 @@ pub struct CreateUserPayload {
 /// PUT /api/v1/users/me or PUT /api/v1/users/:id
 #[derive(Debug, Deserialize, validator::Validate)]
 pub struct UpdateUserPayload {
-    #[validate(length(
-        min = 1,
-        max = 100,
-        message = "展示名不能为空，最多 100 个字符"
-    ))]
+    #[validate(length(min = 1, max = 100, message = "展示名不能为空，最多 100 个字符"))]
     pub display_name: Option<String>,
 
     #[validate(email(message = "邮箱格式不正确"))]

@@ -97,8 +97,7 @@ mod tests {
 
     #[test]
     fn test_failure_returns_custom_code_and_message() {
-        let resp: ApiResponse<()> =
-            ApiResponse::failure(StatusCode::NOT_FOUND, "Not Found");
+        let resp: ApiResponse<()> = ApiResponse::failure(StatusCode::NOT_FOUND, "Not Found");
         assert_eq!(resp.code, 404);
         assert_eq!(resp.message, "Not Found");
         assert!(resp.data.is_none());

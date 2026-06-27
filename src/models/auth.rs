@@ -49,11 +49,7 @@ impl JwtClaims {
 /// POST /api/v1/auth/register
 #[derive(Debug, Deserialize, validator::Validate)]
 pub struct RegisterPayload {
-    #[validate(length(
-        min = 1,
-        max = 100,
-        message = "展示名不能为空，最多 100 个字符"
-    ))]
+    #[validate(length(min = 1, max = 100, message = "展示名不能为空，最多 100 个字符"))]
     pub display_name: String,
 
     #[validate(length(min = 3, max = 50, message = "用户名长度需在 3-50 之间"))]
@@ -107,8 +103,7 @@ pub fn validate_password(password: &str) -> Result<(), validator::ValidationErro
 
     if !has_digit || !has_alpha || !has_special {
         let mut err = validator::ValidationError::new("password_weak");
-        err.message =
-            Some("密码必须包含至少一个数字、一个英文字母和一个特殊字符".into());
+        err.message = Some("密码必须包含至少一个数字、一个英文字母和一个特殊字符".into());
         return Err(err);
     }
 
@@ -163,7 +158,10 @@ mod tests {
         };
         let err = p.validate().unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("特殊"), "expected special char complaint: {msg}");
+        assert!(
+            msg.contains("特殊"),
+            "expected special char complaint: {msg}"
+        );
     }
 
     #[test]
