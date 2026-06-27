@@ -88,7 +88,7 @@ src/
 │   └── signals.rs   # 跨平台信号监听（SIGINT、SIGTERM、SIGHUP）
 └── routes/
     ├── mod.rs       # 路由模块声明
-    ├── hello.rs     # GET /api/v1/hello
+    ├── health.rs    # GET /api/v1/health — Docker 兼容健康检查（验证 DB + Valkey 连通性）
     ├── auth.rs      # POST register, POST login
     ├── users.rs     # CRUD /users, /users/me, 分页, check_manage_scope
     ├── roles.rs     # GET /roles, GET /roles/:id
@@ -116,7 +116,7 @@ config/
 - **优雅关闭（两级）**：信号到达后，axum 开始排空进行中的请求（有 `drain_timeout` 保护，默认 10 秒）。资源按 LIFO 顺序通过 `ShutdownRegistry` 清理。无论服务器如何退出，清理始终运行。
 - **配置注入**：`config::load()` → `SharedConfig`（`Arc<AppConfig>`）→ 存入 `AppState.config`。
 - **集成测试**：使用 `tower::ServiceExt::oneshot()` 测试 axum 路由——无需运行服务器。导入来自 `api_manage_platform` crate（通过 `lib.rs` 公开）。
-- **统一响应格式**：所有 API 端点返回 `ApiResponse<T>`（定义在 `src/response.rs`），包含 `code`、`message`、`data` 字段。提供了 `success()`、`ok()`、`failure()`、`message()` 工厂方法。`ApiResponse` 实现了 `IntoResponse`，自动序列化为 JSON。
+- **统一响应格式**：所有 API 端点返回 `ApiResponse<T>`（定义在 `src/response.rs`），包含 `code`、`message`、`data` 字段。提供了 `success()`、`ok()`、`failure()`、`message()` 工厂方法。健康检查等需要自定义 HTTP 状态码的端点可直接构造 `ApiResponse`，手动设置 `code`（如 `StatusCode::SERVICE_UNAVAILABLE`）。`ApiResponse` 实现了 `IntoResponse`，自动序列化为 JSON。
 - **环境变量格式**：`APP__` 前缀 + `__` 分隔符 → 嵌套结构体。如 `APP__SERVER__PORT=8080` → `server.port`。
 - **配置加载顺序**：`default.toml` → `{APP_ENV}.toml`（可选）→ 环境变量 `APP__*`（最高优先级）。
 - **Rust edition 2024**：项目使用 Rust 2024 edition。`std::env::set_var` / `remove_var` 在此 edition 中为 `unsafe`。
@@ -128,8 +128,11 @@ config/
 
 ## 开发约定
 
+- **修改代码后格式化**：每次修改 `.rs` 文件后，运行 `cargo fmt` 确保代码风格一致。
+- **查看仓库代码**：优先使用 `codegraph` MCP 工具（`codegraph_explore`、`codegraph_node`、`codegraph_search`）理解代码结构和调用关系，避免逐文件 Read。
+- **查询 API/库文档**：需要查阅 `axum`、`sqlx`、`fred`、`tokio` 等依赖的官方文档时，使用 context7（`resolve-library-id` → `query-docs`）获取最新文档和示例。
 - **SQL 索引命名**：`pk_` 主键 | `uk_` 唯一 | `idx_` 普通 | `fk_` 外键（如 `uk_users_email`、`idx_users_cursor`、`fk_user_roles_user_id`）
-- **启动流程**：config::load() → shutdown::init_tracing() → db::init_pool() → valkey::init_pool() → ShutdownRegistry → AppState → 路由 → shutdown::run(listener, app, registry, config)。连接失败使用 `.inspect_err(\|e\| tracing::error!(…))` 记录日志后退出，fail-fast 不延迟连接。
+- **启动流程**：config::load() → shutdown::init_tracing() → db::init_pool() → run_migrations()（`sqlx::migrate!("./migrations").run(&pool)` 自动执行）→ valkey::init_pool() → ShutdownRegistry → AppState → 路由 → shutdown::run(listener, app, registry, config)。连接失败使用 `.inspect_err(\|e\| tracing::error!(…))` 记录日志后退出，fail-fast 不延迟连接。
 - **首次运行**：`cp .env.example .env` → 设置 `APP_ENV` 和 `APP__JWT__SECRET` → `cargo run`
 - **环境变量测试**：`cargo test -- --test-threads=1`（`set_var`/`remove_var` 在 Rust 2024 中为 `unsafe`，测试必须串行）
 - **Secrets**：`jwt.secret` 不写入 TOML，必须通过 `APP__JWT__SECRET` 注入。`#[serde(default)]` + validator `length(min=32)` + loader 显式检查三重保证
