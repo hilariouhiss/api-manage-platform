@@ -35,6 +35,15 @@ cargo clippy
 
 # 运行数据库迁移（使用 sqlx-cli）
 sqlx migrate run --database-url <DATABASE_URL>
+
+# Docker Compose 启动（app + PostgreSQL + Valkey）
+docker compose --env-file .env.compose up -d
+
+# Docker Compose 查看日志
+docker compose logs -f app
+
+# Docker Compose 停止（保留数据卷）
+docker compose down
 ```
 
 ## 技术栈
@@ -48,7 +57,7 @@ sqlx migrate run --database-url <DATABASE_URL>
 | HTTP 客户端 | `reqwest` 0.13 | json feature |
 | 数据库 | `sqlx` 0.9 | PostgreSQL, rustls, uuid, chrono, migrate |
 | 缓存/Redis | `fred` 10.1 | rustls。⚠ 初始化池必须用 `Config::from_url(&url)` + `Builder::from_config(config)` 传入地址；`Builder::default_centralized()` 会忽略 URL |
-| 认证 | `argon2` 0.5, `jsonwebtoken` 10.4 | |
+| 认证 | `argon2` 0.5, `jsonwebtoken` 10.4 | ⚠ 必须 `features = ["aws_lc_rs"]`，否则编译通过但 JWT 操作 panic |
 | 校验 | `validator` 0.20 | derive macro |
 | UUID | `uuid` 1.23 | v7, serde |
 | 日期时间 | `chrono` 0.4 | serde |
@@ -103,6 +112,7 @@ config/
 
 .env.example          # 环境变量模板（含注释）
 .env                  # 本地开发（gitignored）
+.env.compose          # Docker Compose 密钥（gitignored）
 ```
 
 ### 核心模式
@@ -120,6 +130,7 @@ config/
 - **环境变量格式**：`APP__` 前缀 + `__` 分隔符 → 嵌套结构体。如 `APP__SERVER__PORT=8080` → `server.port`。
 - **配置加载顺序**：`default.toml` → `{APP_ENV}.toml`（可选）→ 环境变量 `APP__*`（最高优先级）。
 - **Rust edition 2024**：项目使用 Rust 2024 edition。`std::env::set_var` / `remove_var` 在此 edition 中为 `unsafe`。
+- **容器环境**：容器内 `APP__SERVER__HOST` 必须为 `0.0.0.0`。项目使用 rustls，运行时仅需 `ca-certificates`（无需 libssl）。迁移脚本 `sqlx::migrate!` 在编译期嵌入，运行时不需要 `migrations/` 目录。
 
 ### 文档
 
