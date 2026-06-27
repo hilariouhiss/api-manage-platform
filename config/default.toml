@@ -3,14 +3,14 @@ host = "127.0.0.1"
 port = 3000
 
 [database]
-url = "postgres://localhost:5432/api_platform"
+url = "postgres://localhost:5432/amp"
 max_connections = 10
 min_connections = 1
 acquire_timeout_seconds = 30
 idle_timeout_minutes = 30
 
 [valkey]
-url = "redis://localhost:6379"
+url = "redis://:amp@localhost:6379"
 pool_size = 8
 connect_timeout_seconds = 10
 internal_command_timeout_seconds = 10
