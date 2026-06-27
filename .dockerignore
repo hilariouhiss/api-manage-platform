@@ -1,0 +1,47 @@
+# Rust build artifacts
+/target
+
+# Environment files (may contain secrets)
+.env
+.env.compose
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Agent and AI tooling
+.claude/
+.qoder/
+.reasonix/
+reasonix.toml
+.remember/
+.superpowers/
+/docs/superpowers/
+.codegraph/
+/openspec/
+
+# Worktrees
+.worktrees/
+
+# IDE files
+.vscode/
+.idea/
+
+# Log files
+logs/
+
+# Documentation (not needed for build)
+docs/
+
+# Integration tests (not compiled in release build)
+tests/
+
+# Docker and compose files (not needed inside image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# README and other docs
+README.md
+CLAUDE.md

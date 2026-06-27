@@ -23,6 +23,7 @@ reasonix.toml
 
 # Environment
 .env
+.env.compose
 
 # Log files
 logs/

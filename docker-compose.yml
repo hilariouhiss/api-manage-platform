@@ -1,0 +1,108 @@
+services:
+  # ============================================================
+  # PostgreSQL 18
+  # ============================================================
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: amp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-amp}
+      POSTGRES_DB: amp
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U amp -d amp" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # ============================================================
+  # Valkey 9
+  # ============================================================
+  valkey:
+    image: valkey/valkey:9-alpine
+    command: >
+      valkey-server --requirepass ${VALKEY_PASSWORD:-amp} --save 60 1 --loglevel warning
+    volumes:
+      - valkeydata:/data
+    healthcheck:
+      test: [ "CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD:-amp}", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # ============================================================
+  # API Manage Platform
+  # ============================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: production
+      APP__SERVER__HOST: 0.0.0.0
+      APP__SERVER__PORT: 3000
+      APP__DATABASE__URL: postgres://amp:${POSTGRES_PASSWORD:-amp}@postgres:5432/amp
+      APP__DATABASE__MAX_CONNECTIONS: 10
+      APP__DATABASE__MIN_CONNECTIONS: 1
+      APP__DATABASE__ACQUIRE_TIMEOUT_SECONDS: 30
+      APP__DATABASE__IDLE_TIMEOUT_MINUTES: 30
+      APP__VALKEY__URL: redis://:${VALKEY_PASSWORD:-amp}@valkey:6379
+      APP__VALKEY__POOL_SIZE: 8
+      APP__VALKEY__CONNECT_TIMEOUT_SECONDS: 5
+      APP__VALKEY__INTERNAL_COMMAND_TIMEOUT_SECONDS: 10
+      APP__JWT__SECRET: ${APP__JWT__SECRET:-change-me-to-a-strong-random-secret-at-least-32-chars}
+      APP__JWT__EXPIRY_HOURS: 24
+      APP__LOGGING__LEVEL: info
+      APP__LOGGING__FORMAT: json
+      APP__LOGGING__LOG_DIR: /app/logs
+      APP__LOGGING__LOG_ROTATION: daily
+    volumes:
+      - applogs:/app/logs
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:3000/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+        reservations:
+          cpus: "0.5"
+          memory: 128M
+
+# ============================================================
+# Volumes
+# ============================================================
+volumes:
+  pgdata:
+  valkeydata:
+  applogs:
+
+    # ============================================================
+    # Network
+    # ============================================================
+networks:
+  internal:
+    driver: bridge

@@ -40,7 +40,7 @@ chrono = { version = "0.4.45", features = ["serde"] }
 dotenvy = "0.15.7"
 config = "0.15.24"
 argon2 = "0.5.3"
-jsonwebtoken = "10.4.0"
+jsonwebtoken = { version = "10.4.0", features = ["aws_lc_rs"] }
 base64 = "0.22.1"
 
 # utoipa = { version = "5.5.0", features = ["axum_extras"] }
