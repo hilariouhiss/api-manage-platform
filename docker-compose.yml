@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-amp}
       POSTGRES_DB: amp
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U amp -d amp" ]
       interval: 5s
@@ -34,12 +34,14 @@ services:
   # ============================================================
   valkey:
     image: valkey/valkey:9-alpine
+    environment:
+      REDISCLI_AUTH: ${VALKEY_PASSWORD:-amp}
     command: >
       valkey-server --requirepass ${VALKEY_PASSWORD:-amp} --save 60 1 --loglevel warning
     volumes:
       - valkeydata:/data
     healthcheck:
-      test: [ "CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD:-amp}", "ping" ]
+      test: [ "CMD", "valkey-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -68,7 +70,7 @@ services:
       APP__VALKEY__POOL_SIZE: 8
       APP__VALKEY__CONNECT_TIMEOUT_SECONDS: 5
       APP__VALKEY__INTERNAL_COMMAND_TIMEOUT_SECONDS: 10
-      APP__JWT__SECRET: ${APP__JWT__SECRET:-change-me-to-a-strong-random-secret-at-least-32-chars}
+      APP__JWT__SECRET: ${APP__JWT__SECRET:?生产环境必须通过 .env.compose 或环境变量设置 APP__JWT__SECRET}
       APP__JWT__EXPIRY_HOURS: 24
       APP__LOGGING__LEVEL: info
       APP__LOGGING__FORMAT: json
@@ -92,14 +94,8 @@ services:
     networks:
       - internal
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "1"
-          memory: 256M
-        reservations:
-          cpus: "0.5"
-          memory: 128M
+    # 资源限制（仅 swarm 模式生效：docker stack deploy）
+    # 普通 docker compose 使用 --cpus / --memory 参数
 
 # ============================================================
 # Volumes
