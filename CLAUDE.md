@@ -147,3 +147,4 @@ config/
 - **首次运行**：`cp .env.example .env` → 设置 `APP_ENV` 和 `APP__JWT__SECRET` → `cargo run`
 - **环境变量测试**：`cargo test -- --test-threads=1`（`set_var`/`remove_var` 在 Rust 2024 中为 `unsafe`，测试必须串行）
 - **Secrets**：`jwt.secret` 不写入 TOML，必须通过 `APP__JWT__SECRET` 注入。`#[serde(default)]` + validator `length(min=32)` + loader 显式检查三重保证
+- **修改后同步更新**：修改代码或功能后，同步更新测试用例、`CLAUDE.md`（开发约定/核心模式）、`docs/architecture-design.md`（架构设计）和 `docs/detailed-design/`（详细设计），保持文档与代码一致
