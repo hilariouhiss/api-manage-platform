@@ -24,5 +24,6 @@ reasonix.toml
 # Environment
 .env
 
-
+# Log files
+logs/
 
